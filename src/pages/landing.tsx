@@ -3,23 +3,76 @@ import { ClipboardList, Heart, Pill, Smartphone, Monitor } from 'lucide-react';
 import { Mark } from '@/components/brand/Mark';
 import { Button } from '@/components/ui/Button';
 import { APP_NAME, APP_NAME_MEANING } from '@/lib/labels';
+import { useAuth } from '@/contexts/AuthContext';
+import { appHomePath, sessionLabel } from '@/lib/session';
 import './landing.css';
 
-function Cta({ compact = false }: { compact?: boolean }) {
+function HeaderCta() {
+  const { firebaseUser, me, loading, logout } = useAuth();
+  if (loading) return <span className="text-sm text-[var(--ink-soft)]">Cargando...</span>;
+  if (firebaseUser) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="hidden text-sm text-[var(--ink-soft)] sm:inline">Hola, {sessionLabel(me, firebaseUser.email)}</span>
+        <Link to={appHomePath(me)}>
+          <Button>Entrar a mi cuenta</Button>
+        </Link>
+        <button type="button" className="text-sm text-[var(--ink-soft)]" onClick={() => void logout()}>
+          Salir
+        </button>
+      </div>
+    );
+  }
   return (
-    <div className={compact ? 'flex items-center gap-2' : 'flex flex-wrap items-center gap-3'}>
-      <Link to="/registro/profesional">
-        <Button>Crear mi espacio</Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <Link to="/ingresar">
+        <Button variant="secondary">Soy paciente</Button>
       </Link>
-      {!compact ? (
+      <Link to="/registro/profesional" className="hidden sm:inline">
+        <Button>Soy profesional</Button>
+      </Link>
+      <Link to="/ingresar" className="text-sm text-[var(--ink-soft)] sm:hidden">
+        Ingresar
+      </Link>
+    </div>
+  );
+}
+
+function HeroCta() {
+  const { firebaseUser, me, loading } = useAuth();
+  if (loading) return null;
+  if (firebaseUser) {
+    const patient = Boolean(me?.patientMemberships.length);
+    return (
+      <div className="space-y-3">
+        <p className="text-[var(--ink-soft)]">
+          Ya estás dentro, {sessionLabel(me, firebaseUser.email)}. No hace falta volver a ingresar.
+        </p>
+        <Link to={appHomePath(me)}>
+          <Button>{patient ? 'Cargar cómo estoy hoy' : 'Ir a mi consultorio'}</Button>
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link to="/registro/profesional">
+          <Button>Crear mi espacio</Button>
+        </Link>
         <Link to="/ingresar">
           <Button variant="ghost">Ya tengo cuenta</Button>
         </Link>
-      ) : (
-        <Link to="/ingresar" className="hidden text-sm text-[var(--ink-soft)] sm:inline">
-          Ingresar
+      </div>
+      <div className="rounded-[var(--radius-card)] border border-[var(--sage)] bg-[var(--sage-soft)] px-4 py-3">
+        <p className="font-medium">¿Sos paciente?</p>
+        <p className="text-sm text-[var(--ink-soft)]">
+          Si tu profesional te pasó un link, abrilo. Si ya te registraste, tocá ingresar: te reconocemos y no te pedimos la clave de nuevo.
+        </p>
+        <Link to="/ingresar" className="mt-2 inline-block">
+          <Button variant="secondary">Ingresar como paciente</Button>
         </Link>
-      )}
+      </div>
     </div>
   );
 }
@@ -33,7 +86,7 @@ export function LandingPage() {
             <Mark size={32} />
             <span className="font-display text-lg tracking-tight text-[var(--ink)]">{APP_NAME}</span>
           </Link>
-          <Cta compact />
+          <HeaderCta />
         </div>
       </header>
 
@@ -49,7 +102,7 @@ export function LandingPage() {
           </p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">{APP_NAME_MEANING}</p>
           <div className="mt-8">
-            <Cta />
+            <HeroCta />
           </div>
         </div>
         <img
@@ -94,6 +147,11 @@ export function LandingPage() {
             No tiene que entender el sistema. Abre el link, crea cuenta o entra, y carga el día. Cabe en el colectivo,
             después de una noche difícil, o a la mañana con el café.
           </p>
+          <div className="mt-5">
+            <Link to="/ingresar">
+              <Button variant="secondary">Ingresar como paciente</Button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -169,17 +227,9 @@ export function LandingPage() {
           <p className="mx-auto mt-4 max-w-md text-[var(--ink-soft)]">
             Gratis para empezar. Mail o Google. En un par de clics tenés consultorio y cuestionario.
           </p>
-          <div className="mt-8 flex justify-center">
-            <Link to="/registro/profesional">
-              <Button>Crear mi espacio</Button>
-            </Link>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <HeroCta />
           </div>
-          <p className="mt-4 text-sm">
-            ¿Te invitaron?{' '}
-            <Link to="/ingresar" className="text-[var(--ink)] underline decoration-[var(--clay)] underline-offset-4">
-              Entrá por acá
-            </Link>
-          </p>
         </div>
       </section>
 
@@ -195,10 +245,11 @@ export function LandingPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-5 text-sm text-[var(--ink-soft)]">
+          <div className="flex flex-wrap gap-5 text-sm text-[var(--ink-soft)]">
             <Link to="/privacidad">Privacidad</Link>
             <Link to="/terminos">Términos</Link>
-            <Link to="/registro/profesional">Empezar</Link>
+            <Link to="/ingresar">Soy paciente</Link>
+            <Link to="/registro/profesional">Soy profesional</Link>
           </div>
         </div>
       </footer>

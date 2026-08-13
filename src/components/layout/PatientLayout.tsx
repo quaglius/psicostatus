@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { APP_NAME } from '@/lib/labels';
 
 interface PatientLayoutProps {
   children: ReactNode;
@@ -46,7 +47,11 @@ export function PatientLayout({
           </div>
         ) : workspaceName ? (
           <p className="mb-2 text-sm text-[var(--ink-soft)]">{workspaceName}</p>
-        ) : null}
+        ) : (
+          <Link to="/" className="mb-2 inline-block text-sm text-[var(--ink-soft)]">
+            {APP_NAME}
+          </Link>
+        )}
 
         <nav className="mb-6 flex gap-1 rounded-full bg-[var(--empty)] p-1">
           {tabs.map((tab) => {

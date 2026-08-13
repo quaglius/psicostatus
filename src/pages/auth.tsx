@@ -234,7 +234,15 @@ export function AuthForm({
 }
 
 export function LoginPage() {
-  return <AuthForm mode="login" redirectTo="/app" />;
+  return (
+    <AuthForm
+      mode="login"
+      allowSwitch
+      redirectTo="/app"
+      title="Ingresar"
+      subtitle="Pacientes y profesionales. Si ya estás en este dispositivo, te llevamos adentro y no te pedimos la clave de nuevo."
+    />
+  );
 }
 
 export function RegisterProfessionalPage() {

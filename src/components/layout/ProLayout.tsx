@@ -25,13 +25,13 @@ export function ProLayout({ children, workspaceName }: ProLayoutProps) {
     <div className="min-h-screen bg-[var(--paper)]">
       <header className="border-b border-[var(--line)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-[1080px] flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3 no-underline hover:no-underline">
             <Avatar name={workspaceName ?? APP_NAME} src={workspace?.imageUrl} size={40} />
             <div>
               <p className="font-display text-xl text-[var(--ink)]">{APP_NAME}</p>
               {workspaceName ? <p className="text-sm text-[var(--ink-soft)]">{workspaceName}</p> : null}
             </div>
-          </div>
+          </Link>
           <nav className="flex flex-wrap gap-2">
             {NAV.map((item) => {
               const active = location.pathname.startsWith(item.to);

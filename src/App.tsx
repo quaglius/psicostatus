@@ -15,6 +15,7 @@ import { PatientAccountPage } from '@/pages/patient/account';
 import { AdminPage } from '@/pages/admin/index';
 import { PrivacyPage, TermsPage } from '@/pages/legal';
 import { DevUiPage } from '@/pages/dev/ui';
+import { appHomePath } from '@/lib/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { firebaseUser, loading } = useAuth();
@@ -36,10 +37,14 @@ function AppRedirect() {
       </div>
     );
   }
-  if (me.user.platformRole === 'global_admin') return <Navigate to="/admin" replace />;
-  if (me.patientMemberships.length) return <Navigate to="/paciente/hoy" replace />;
-  if (me.workspaceMemberships.length) return <Navigate to="/pro/pacientes" replace />;
-  return <Navigate to="/pro/onboarding" replace />;
+  return <Navigate to={appHomePath(me)} replace />;
+}
+
+function GuestOnly({ children }: { children: React.ReactNode }) {
+  const { firebaseUser, me, loading } = useAuth();
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-[var(--ink-soft)]">Cargando...</div>;
+  if (firebaseUser) return <Navigate to={appHomePath(me)} replace />;
+  return <>{children}</>;
 }
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
@@ -53,8 +58,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/ingresar" element={<LoginPage />} />
-      <Route path="/registro/profesional" element={<RegisterProfessionalPage />} />
+      <Route path="/ingresar" element={<GuestOnly><LoginPage /></GuestOnly>} />
+      <Route path="/registro/profesional" element={<GuestOnly><RegisterProfessionalPage /></GuestOnly>} />
       <Route path="/privacidad" element={<PrivacyPage />} />
       <Route path="/terminos" element={<TermsPage />} />
       <Route path="/i/:token" element={<InvitePage />} />

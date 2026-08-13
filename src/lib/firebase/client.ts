@@ -9,6 +9,8 @@ import {
   sendEmailVerification,
   signOut,
   onIdTokenChanged,
+  setPersistence,
+  browserLocalPersistence,
   type Auth,
   type User,
 } from 'firebase/auth';
@@ -30,6 +32,7 @@ let authInstance: Auth | null = null;
 if (isFirebaseConfigured()) {
   app = initializeApp(firebaseConfig);
   authInstance = getAuth(app);
+  void setPersistence(authInstance, browserLocalPersistence);
 }
 
 export const auth = authInstance;
