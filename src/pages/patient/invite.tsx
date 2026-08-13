@@ -71,9 +71,14 @@ export function InvitePage() {
   if (!firebaseUser) {
     return (
       <AuthForm
-        mode="login"
+        mode="register"
+        allowSwitch
         title={`Te invita ${invite.workspaceName}`}
-        subtitle={invite.kind === 'staff' ? `Rol: ${invite.role}` : 'Creá tu cuenta para empezar'}
+        subtitle={
+          invite.kind === 'staff'
+            ? `Rol: ${invite.role}. Creá tu cuenta o ingresá si ya tenés una.`
+            : 'Creá tu cuenta o ingresá si ya tenés una.'
+        }
         redirectTo={`/i/${token}`}
       />
     );

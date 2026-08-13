@@ -16,19 +16,31 @@ import { Card } from '@/components/ui/Card';
 
 export interface AuthFormProps {
   mode: 'login' | 'register';
+  allowSwitch?: boolean;
   redirectTo?: string;
   title?: string;
   subtitle?: string;
 }
 
-function authErrorMessage(err: unknown, fallback: string): string {
+function authErrorMessage(
+  err: unknown,
+  fallback: string,
+  ctx: { mode: 'login' | 'register'; allowSwitch: boolean },
+): string {
   const code = typeof err === 'object' && err && 'code' in err ? String((err as { code: string }).code) : '';
   const map: Record<string, string> = {
-    'auth/email-already-in-use': 'Ese correo ya tiene cuenta. Entrá desde Ingresar.',
+    'auth/email-already-in-use': ctx.allowSwitch
+      ? 'Ese correo ya tiene cuenta. Tocá «Ya tengo cuenta» e ingresá.'
+      : 'Ese correo ya tiene cuenta. Entrá desde Ingresar.',
     'auth/invalid-email': 'El correo no es válido.',
     'auth/weak-password': 'La contraseña tiene que tener al menos 6 caracteres.',
-    'auth/invalid-credential': 'Correo o contraseña incorrectos.',
-    'auth/user-not-found': 'No hay una cuenta con ese correo.',
+    'auth/invalid-credential':
+      ctx.allowSwitch && ctx.mode === 'login'
+        ? 'Correo o contraseña incorrectos. Si es tu primera vez, tocá «Crear cuenta».'
+        : 'Correo o contraseña incorrectos.',
+    'auth/user-not-found': ctx.allowSwitch
+      ? 'No hay una cuenta con ese correo. Tocá «Crear cuenta».'
+      : 'No hay una cuenta con ese correo.',
     'auth/wrong-password': 'Correo o contraseña incorrectos.',
     'auth/popup-closed-by-user': 'Cerraste la ventana de Google. Probá de nuevo.',
     'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permití popups.',
@@ -44,15 +56,28 @@ function authErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFormProps) {
+export function AuthForm({
+  mode: initialMode,
+  allowSwitch = false,
+  redirectTo = '/app',
+  title,
+  subtitle,
+}: AuthFormProps) {
   const navigate = useNavigate();
   const { refreshMe } = useAuth();
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+
+  const switchMode = (next: 'login' | 'register') => {
+    setMode(next);
+    setError('');
+    setResetSent(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +102,13 @@ export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFor
       await refreshMe();
       navigate(redirectTo);
     } catch (err) {
-      setError(authErrorMessage(err, mode === 'register' ? 'No pudimos crear tu cuenta. Probá de nuevo.' : 'Correo o contraseña incorrectos.'));
+      setError(
+        authErrorMessage(
+          err,
+          mode === 'register' ? 'No pudimos crear tu cuenta. Probá de nuevo.' : 'Correo o contraseña incorrectos.',
+          { mode, allowSwitch },
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -94,7 +125,7 @@ export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFor
       await refreshMe();
       navigate(redirectTo);
     } catch (err) {
-      setError(authErrorMessage(err, 'No pudimos ingresar con Google.'));
+      setError(authErrorMessage(err, 'No pudimos ingresar con Google.', { mode, allowSwitch }));
     } finally {
       setLoading(false);
     }
@@ -118,6 +149,35 @@ export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFor
           </h1>
           {subtitle ? <p className="mt-1 text-sm text-[var(--ink-soft)]">{subtitle}</p> : null}
         </div>
+
+        {allowSwitch ? (
+          <div className="grid grid-cols-2 rounded-full bg-[var(--line)] p-1" role="tablist" aria-label="Crear cuenta o ingresar">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'register'}
+              className={[
+                'rounded-full py-2 text-sm transition-colors',
+                mode === 'register' ? 'bg-[var(--paper)] font-medium text-[var(--ink)] shadow-sm' : 'text-[var(--ink-soft)]',
+              ].join(' ')}
+              onClick={() => switchMode('register')}
+            >
+              Crear cuenta
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'login'}
+              className={[
+                'rounded-full py-2 text-sm transition-colors',
+                mode === 'login' ? 'bg-[var(--paper)] font-medium text-[var(--ink)] shadow-sm' : 'text-[var(--ink-soft)]',
+              ].join(' ')}
+              onClick={() => switchMode('login')}
+            >
+              Ya tengo cuenta
+            </button>
+          </div>
+        ) : null}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
