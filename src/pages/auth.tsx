@@ -21,6 +21,29 @@ export interface AuthFormProps {
   subtitle?: string;
 }
 
+function authErrorMessage(err: unknown, fallback: string): string {
+  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code: string }).code) : '';
+  const map: Record<string, string> = {
+    'auth/email-already-in-use': 'Ese correo ya tiene cuenta. Entrá desde Ingresar.',
+    'auth/invalid-email': 'El correo no es válido.',
+    'auth/weak-password': 'La contraseña tiene que tener al menos 6 caracteres.',
+    'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+    'auth/user-not-found': 'No hay una cuenta con ese correo.',
+    'auth/wrong-password': 'Correo o contraseña incorrectos.',
+    'auth/popup-closed-by-user': 'Cerraste la ventana de Google. Probá de nuevo.',
+    'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permití popups.',
+    'auth/cancelled-popup-request': 'Se canceló el ingreso con Google.',
+    'auth/unauthorized-domain': 'Este dominio no está autorizado en Firebase.',
+    'auth/operation-not-allowed': 'Este método de ingreso no está habilitado en Firebase.',
+    'auth/too-many-requests': 'Demasiados intentos. Esperá un rato.',
+    'auth/network-request-failed': 'No hay conexión con Google. Revisá red o bloqueadores.',
+    'auth/internal-error': 'Google rechazó el pedido. Suele ser un bloqueo del navegador o CSP.',
+  };
+  if (code && map[code]) return map[code];
+  if (err instanceof Error && err.message && !err.message.startsWith('Firebase:')) return err.message;
+  return fallback;
+}
+
 export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFormProps) {
   const navigate = useNavigate();
   const { refreshMe } = useAuth();
@@ -43,14 +66,18 @@ export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFor
       const firebaseAuth = requireAuth();
       if (mode === 'register') {
         const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-        await sendEmailVerification(cred.user);
+        try {
+          await sendEmailVerification(cred.user);
+        } catch {
+          // La cuenta ya existe; el mail de verificación no debe frenar el alta.
+        }
       } else {
         await signInWithEmailAndPassword(firebaseAuth, email, password);
       }
       await refreshMe();
       navigate(redirectTo);
-    } catch {
-      setError(mode === 'register' ? 'No pudimos crear tu cuenta. Probá de nuevo.' : 'Correo o contraseña incorrectos.');
+    } catch (err) {
+      setError(authErrorMessage(err, mode === 'register' ? 'No pudimos crear tu cuenta. Probá de nuevo.' : 'Correo o contraseña incorrectos.'));
     } finally {
       setLoading(false);
     }
@@ -66,8 +93,8 @@ export function AuthForm({ mode, redirectTo = '/app', title, subtitle }: AuthFor
       await signInWithPopup(requireAuth(), googleProvider);
       await refreshMe();
       navigate(redirectTo);
-    } catch {
-      setError('No pudimos ingresar con Google.');
+    } catch (err) {
+      setError(authErrorMessage(err, 'No pudimos ingresar con Google.'));
     } finally {
       setLoading(false);
     }
