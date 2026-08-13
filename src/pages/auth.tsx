@@ -178,5 +178,5 @@ export function LoginPage() {
 }
 
 export function RegisterProfessionalPage() {
-  return <AuthForm mode="register" redirectTo="/pro/onboarding" title="Crear cuenta profesional" />;
+  return <AuthForm mode="register" redirectTo="/app" title="Crear cuenta profesional" />;
 }

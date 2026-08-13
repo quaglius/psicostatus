@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
@@ -9,16 +9,36 @@ import type { WorkspaceKind } from '@shared/types';
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const { refreshMe } = useAuth();
+  const { me, loading, refreshMe } = useAuth();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<WorkspaceKind>('solo');
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
 
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center text-[var(--ink-soft)]">Cargando...</div>;
+  }
+  if (!me) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[var(--paper)] px-4 text-center">
+        <p className="text-[var(--ink-soft)]">No pudimos cargar tu cuenta.</p>
+        <button type="button" className="text-sm underline" onClick={() => void refreshMe()}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+  if (me.user.platformRole === 'global_admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  if (me.workspaceMemberships.length) {
+    return <Navigate to="/pro/pacientes" replace />;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setFormLoading(true);
     setError('');
     try {
       const res = await apiFetch<{ patientInviteToken: string }>('workspaces', {
@@ -32,7 +52,7 @@ export function OnboardingPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No pudimos crear el espacio');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
@@ -72,7 +92,7 @@ export function OnboardingPage() {
 
           {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 
-          <Button type="submit" fullWidth disabled={loading || !name.trim()}>
+          <Button type="submit" fullWidth disabled={formLoading || !name.trim()}>
             Crear espacio
           </Button>
         </form>

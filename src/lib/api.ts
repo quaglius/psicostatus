@@ -23,7 +23,21 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   const res = await fetch(`/api/${path}`, { ...options, headers });
-  const data = await res.json();
+  const text = await res.text();
+  if (!text) {
+    throw new ApiClientError(
+      'EMPTY_RESPONSE',
+      'El servidor no respondió. Probá de nuevo en un momento.',
+      res.status,
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new ApiClientError('INVALID_RESPONSE', 'El servidor respondió mal. Probá de nuevo.', res.status, text);
+  }
 
   if (!res.ok) {
     const err = data as ApiError;

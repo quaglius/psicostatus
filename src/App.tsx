@@ -24,11 +24,21 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function AppRedirect() {
-  const { me, loading } = useAuth();
-  if (loading) return null;
-  if (me?.user.platformRole === 'global_admin') return <Navigate to="/admin" replace />;
-  if (me?.patientMemberships.length) return <Navigate to="/paciente/hoy" replace />;
-  if (me?.workspaceMemberships.length) return <Navigate to="/pro/pacientes" replace />;
+  const { me, loading, refreshMe } = useAuth();
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-[var(--ink-soft)]">Cargando...</div>;
+  if (!me) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[var(--paper)] px-4 text-center">
+        <p className="text-[var(--ink-soft)]">No pudimos cargar tu cuenta.</p>
+        <button type="button" className="text-sm underline" onClick={() => void refreshMe()}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+  if (me.user.platformRole === 'global_admin') return <Navigate to="/admin" replace />;
+  if (me.patientMemberships.length) return <Navigate to="/paciente/hoy" replace />;
+  if (me.workspaceMemberships.length) return <Navigate to="/pro/pacientes" replace />;
   return <Navigate to="/pro/onboarding" replace />;
 }
 

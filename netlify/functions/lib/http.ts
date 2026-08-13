@@ -20,24 +20,37 @@ export class ApiHttpError extends Error {
   }
 }
 
-export async function authenticate(event: HandlerEvent): Promise<AuthContext> {
+export async function verifyBearer(event: HandlerEvent): Promise<{ uid: string; email: string; name: string | null }> {
   const header = event.headers.authorization ?? event.headers.Authorization;
   if (!header?.startsWith('Bearer ')) {
     throw new ApiHttpError(401, 'UNAUTHORIZED', 'Tenés que iniciar sesión');
   }
 
   const token = header.slice(7);
-  let decoded;
   try {
-    decoded = await getAdminAuth().verifyIdToken(token);
-  } catch {
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    let email = (decoded.email ?? '').toLowerCase();
+    if (!email) {
+      const record = await getAdminAuth().getUser(decoded.uid);
+      email = (record.email ?? '').toLowerCase();
+    }
+    return {
+      uid: decoded.uid,
+      email,
+      name: decoded.name ?? null,
+    };
+  } catch (err) {
+    if (err instanceof ApiHttpError) throw err;
     throw new ApiHttpError(401, 'UNAUTHORIZED', 'Sesión inválida o expirada');
   }
+}
 
+export async function authenticate(event: HandlerEvent): Promise<AuthContext> {
+  const identity = await verifyBearer(event);
   const db = getDb();
   const snap = await db
     .collection(COLLECTIONS.users)
-    .where('firebaseUid', '==', decoded.uid)
+    .where('firebaseUid', '==', identity.uid)
     .limit(1)
     .get();
 
@@ -53,8 +66,8 @@ export async function authenticate(event: HandlerEvent): Promise<AuthContext> {
   }
 
   return {
-    uid: decoded.uid,
-    email: decoded.email ?? user.email,
+    uid: identity.uid,
+    email: identity.email || user.email,
     userId: user.id,
     user,
   };
@@ -83,14 +96,19 @@ export function errorResponse(err: unknown) {
 
 export function parseBody<T>(event: HandlerEvent): T {
   if (!event.body) return {} as T;
+  const raw = event.isBase64Encoded
+    ? Buffer.from(event.body, 'base64').toString('utf8')
+    : event.body;
   try {
-    return JSON.parse(event.body) as T;
+    return JSON.parse(raw) as T;
   } catch {
     throw new ApiHttpError(400, 'INVALID_JSON', 'Datos inválidos');
   }
 }
 
 export function getPath(event: HandlerEvent): string {
-  const raw = event.path.replace(/^\/\.netlify\/functions\/api\/?/, '').replace(/^\/api\/?/, '');
-  return raw.startsWith('/') ? raw.slice(1) : raw;
+  const raw = (event.path || '')
+    .replace(/^\/\.netlify\/functions\/api\/?/, '')
+    .replace(/^\/api\/?/, '');
+  return raw.replace(/^\/+/, '').replace(/\/+$/, '');
 }

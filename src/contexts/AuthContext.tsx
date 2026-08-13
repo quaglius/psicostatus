@@ -33,7 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMe(data);
     } catch {
       try {
-        const bootstrapped = await apiFetch<MeResponse>('me/bootstrap', { method: 'POST', body: '{}' });
+        const bootstrapped = await apiFetch<MeResponse>('me/bootstrap', {
+          method: 'POST',
+          body: JSON.stringify({ displayName: auth.currentUser.displayName ?? undefined }),
+        });
         setMe(bootstrapped);
       } catch {
         setMe(null);

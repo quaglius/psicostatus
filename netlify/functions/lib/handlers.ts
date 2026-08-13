@@ -35,7 +35,7 @@ import {
   listVisiblePatients,
 } from './access';
 import { COLLECTIONS, getAdminAuth, getDb } from './firebase';
-import { ApiHttpError, type AuthContext, jsonResponse, parseBody } from './http';
+import { ApiHttpError, type AuthContext, jsonResponse, parseBody, verifyBearer } from './http';
 
 async function buildMeResponse(userId: string): Promise<MeResponse> {
   const db = getDb();
@@ -69,29 +69,34 @@ async function buildMeResponse(userId: string): Promise<MeResponse> {
   return { user, workspaceMemberships, patientMemberships };
 }
 
-export async function handleBootstrap(auth: AuthContext, event: HandlerEvent) {
+export async function handleBootstrap(event: HandlerEvent) {
+  const identity = await verifyBearer(event);
   const db = getDb();
   const body = parseBody<{ displayName?: string }>(event);
   const adminEmail = (process.env.ADMIN_EMAIL ?? 'daniel.quagliano@gmail.com').toLowerCase();
-  const email = auth.email.toLowerCase();
+  const email = identity.email.toLowerCase();
+  const isAdmin = email === adminEmail;
 
   const existing = await db
     .collection(COLLECTIONS.users)
-    .where('firebaseUid', '==', auth.uid)
+    .where('firebaseUid', '==', identity.uid)
     .limit(1)
     .get();
 
   if (!existing.empty) {
     const doc = existing.docs[0]!;
+    if (isAdmin && (doc.data() as UserDoc).platformRole !== 'global_admin') {
+      await doc.ref.update({ platformRole: 'global_admin', email });
+    }
     return jsonResponse(200, await buildMeResponse(doc.id));
   }
 
   const userId = uuidv4();
   const userData: UserDoc = {
-    firebaseUid: auth.uid,
+    firebaseUid: identity.uid,
     email,
-    displayName: body.displayName ?? null,
-    platformRole: email === adminEmail ? 'global_admin' : 'user',
+    displayName: body.displayName ?? identity.name,
+    platformRole: isAdmin ? 'global_admin' : 'user',
     disabledAt: null,
     createdAt: nowISO(),
   };
@@ -101,6 +106,10 @@ export async function handleBootstrap(auth: AuthContext, event: HandlerEvent) {
 }
 
 export async function handleGetMe(auth: AuthContext) {
+  const adminEmail = (process.env.ADMIN_EMAIL ?? 'daniel.quagliano@gmail.com').toLowerCase();
+  if (auth.email.toLowerCase() === adminEmail && auth.user.platformRole !== 'global_admin') {
+    await getDb().collection(COLLECTIONS.users).doc(auth.userId).update({ platformRole: 'global_admin' });
+  }
   return jsonResponse(200, await buildMeResponse(auth.userId));
 }
 

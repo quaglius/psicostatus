@@ -35,7 +35,7 @@ async function route(event: HandlerEvent) {
   const path = getPath(event);
 
   if (method === 'OPTIONS') {
-    return jsonResponse(204, {});
+    return jsonResponse(200, { ok: true });
   }
 
   // Public routes
@@ -44,9 +44,11 @@ async function route(event: HandlerEvent) {
     return handleGetInvite(token);
   }
 
-  const auth = await authenticate(event);
+  if (method === 'POST' && path === 'me/bootstrap') {
+    return handleBootstrap(event);
+  }
 
-  if (method === 'POST' && path === 'me/bootstrap') return handleBootstrap(auth, event);
+  const auth = await authenticate(event);
   if (method === 'GET' && path === 'me') return handleGetMe(auth);
 
   if (method === 'POST' && path === 'workspaces') return handleCreateWorkspace(auth, event);
