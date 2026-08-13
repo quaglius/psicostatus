@@ -6,6 +6,8 @@ import { AuthForm } from '@/pages/auth';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { MEMBER_ROLE } from '@/lib/labels';
+import type { WorkspaceMemberRole } from '@shared/types';
 
 export function InvitePage() {
   const { token } = useParams<{ token: string }>();
@@ -76,7 +78,7 @@ export function InvitePage() {
         title={`Te invita ${invite.workspaceName}`}
         subtitle={
           invite.kind === 'staff'
-            ? `Rol: ${invite.role}. Creá tu cuenta o ingresá si ya tenés una.`
+            ? `${MEMBER_ROLE[(invite.role as WorkspaceMemberRole) || 'professional'].label}. Creá tu cuenta o ingresá si ya tenés una.`
             : 'Creá tu cuenta o ingresá si ya tenés una.'
         }
         redirectTo={`/i/${token}`}

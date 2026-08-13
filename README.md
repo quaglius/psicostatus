@@ -1,6 +1,6 @@
-# Psicostatus
+# Shanti
 
-Plataforma de seguimiento diario de bienestar para profesionales de salud mental y sus pacientes.
+Seguimiento de ánimo, medicación y notas diarias para psicólogos y psiquiatras. Shanti significa paz.
 
 ## Stack
 

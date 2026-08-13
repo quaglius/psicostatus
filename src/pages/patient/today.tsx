@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch, ApiClientError } from '@/lib/api';
 import { PatientLayout } from '@/components/layout/PatientLayout';
-import { WeekStrip } from '@/components/week-strip';
+import { WeekNav, WeekStrip } from '@/components/week-strip';
 import { EntryForm, useEntryFormState } from '@/components/entry-form';
+import { EntryReadout } from '@/components/entry-readout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Sheet } from '@/components/ui/Sheet';
-import { addDays, formatDateAR, formatDateISO, parseISODate } from '@shared/periodicity';
+import { addDays, formatDateAR, formatDateISO, parseISODate, todayInAR } from '@shared/periodicity';
 import type { EntryDoc, PeriodicityType, TemplateVersionDoc, WeekDayInfo } from '@shared/types';
 
 export function PatientTodayPage() {
@@ -16,7 +17,7 @@ export function PatientTodayPage() {
   const [patientId, setPatientId] = useState<string>('');
   const [week, setWeek] = useState<{ days: WeekDayInfo[]; periodicityType: PeriodicityType } | null>(null);
   const [templateVersion, setTemplateVersion] = useState<TemplateVersionDoc | null>(null);
-  const [selectedDate, setSelectedDate] = useState(formatDateISO(new Date()));
+  const [selectedDate, setSelectedDate] = useState(todayInAR());
   const [weekFrom, setWeekFrom] = useState('');
   const [saving, setSaving] = useState(false);
   const [existingEntries, setExistingEntries] = useState<Array<EntryDoc & { id: string }>>([]);
@@ -27,6 +28,8 @@ export function PatientTodayPage() {
 
   const memberships = me?.patientMemberships ?? [];
   const workspaces = memberships.map((m) => ({ id: m.workspace.id, name: m.workspace.name }));
+  const today = todayInAR();
+  const canMutate = selectedDate === today;
 
   useEffect(() => {
     if (memberships.length && !activeWsId) {
@@ -50,8 +53,8 @@ export function PatientTodayPage() {
     setWeek(res);
     setTemplateVersion(res.templateVersion);
     if (!weekFrom) {
-      const today = res.days.find((d) => d.isToday);
-      if (today) setSelectedDate(today.date);
+      const todayDay = res.days.find((d) => d.isToday);
+      if (todayDay) setSelectedDate(todayDay.date);
     }
   };
 
@@ -107,6 +110,13 @@ export function PatientTodayPage() {
     }
   };
 
+  const handleDelete = async (entryId: string) => {
+    if (!confirm('¿Borrar lo de hoy? No se puede deshacer.')) return;
+    await apiFetch(`entries/${entryId}`, { method: 'DELETE' });
+    await loadWeek();
+    await loadDayEntries();
+  };
+
   const membership = memberships.find((m) => m.workspace.id === activeWsId);
   const greeting = membership ? `Hola, ${membership.firstName}.` : 'Hola.';
   const selectedDay = week?.days.find((d) => d.date === selectedDate);
@@ -114,15 +124,14 @@ export function PatientTodayPage() {
 
   const shiftWeek = (delta: number) => {
     const base = weekFrom ? parseISODate(weekFrom) : new Date();
-    const monday = addDays(base, delta * 7);
-    setWeekFrom(formatDateISO(monday));
+    setWeekFrom(formatDateISO(addDays(base, delta * 7)));
   };
 
   if (!memberships.length) {
     return (
       <PatientLayout>
         <Card>
-          <p className="text-[var(--ink-soft)]">Todavía no estás vinculado a ningún consultorio.</p>
+          <p className="text-[var(--ink-soft)]">Todavía no estás vinculado a ningún consultorio. Pedile el link a tu profesional.</p>
         </Card>
       </PatientLayout>
     );
@@ -138,15 +147,17 @@ export function PatientTodayPage() {
       <div className="mb-6">
         <h1 className="font-display text-2xl text-[var(--ink)]">{greeting}</h1>
         <p className="text-sm text-[var(--ink-soft)]">{formatDateAR(selectedDate)}</p>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]">Tres toques: ánimo, medicación si aplica, y una nota si querés.</p>
       </div>
 
       {week ? (
         <div className="mb-4">
-          <div className="mb-2 flex justify-between">
-            <button type="button" className="text-sm text-[var(--sage)]" onClick={() => shiftWeek(-1)} aria-label="Semana anterior">←</button>
-            <button type="button" className="text-sm text-[var(--sage)]" onClick={() => setWeekFrom('')}>Hoy</button>
-            <button type="button" className="text-sm text-[var(--sage)]" onClick={() => shiftWeek(1)} aria-label="Semana siguiente">→</button>
-          </div>
+          <WeekNav
+            isCurrentWeek={!weekFrom}
+            onPrev={() => shiftWeek(-1)}
+            onNext={() => shiftWeek(1)}
+            onToday={() => setWeekFrom('')}
+          />
           <WeekStrip
             days={week.days}
             periodicityType={week.periodicityType}
@@ -157,28 +168,49 @@ export function PatientTodayPage() {
       ) : null}
 
       {selectedDay?.isFilled && !editing ? (
-        <Card className="mb-6">
-          <p className="text-[var(--ink-soft)]">Ya cargaste para este día.</p>
+        <div className="mb-6 space-y-3">
           {dayEntries.map((e) => (
-            <div key={e.id} className="mt-2">
-              <p className="font-medium">{String(e.values.fld_faces ?? e.values.fld_mood_scale ?? 'Registro')}</p>
-              <p className="text-xs text-[var(--ink-soft)]">
-                Cargado: {new Date(e.createdAt).toLocaleString('es-AR')}
-              </p>
-            </div>
+            <Card key={e.id}>
+              <EntryReadout fields={templateVersion?.fields} entry={e} />
+              {canMutate ? (
+                <div className="mt-4 flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setValues(e.values);
+                      setUpdateEntryId(e.id);
+                      setEditing(true);
+                    }}
+                  >
+                    Editar este día
+                  </Button>
+                  <Button variant="danger" onClick={() => handleDelete(e.id)}>
+                    Borrar
+                  </Button>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--ink-soft)]">
+                  Este día ya quedó registrado. Si hay un error, hablalo con tu profesional.
+                </p>
+              )}
+            </Card>
           ))}
-          <Button className="mt-4" variant="secondary" onClick={() => setEditing(true)}>
-            Editar este día
-          </Button>
-        </Card>
+        </div>
       ) : null}
 
-      {showForm && templateVersion ? (
+      {showForm && templateVersion && (canMutate || !selectedDay?.isFilled) && !selectedDay?.isFuture ? (
         <>
-          <EntryForm fields={templateVersion.fields} values={values} onChange={setValues} errors={errors} />
-          <Button className="mt-8" fullWidth onClick={() => handleSave()} disabled={saving || selectedDay?.isFuture}>
-            Guardar
-          </Button>
+          {!canMutate && !selectedDay?.isFilled ? (
+            <p className="mb-3 text-sm text-[var(--ink-soft)]">Estás completando un día que faltaba.</p>
+          ) : null}
+          {canMutate || !selectedDay?.isFilled ? (
+            <>
+              <EntryForm fields={templateVersion.fields} values={values} onChange={setValues} errors={errors} />
+              <Button className="mt-8" fullWidth onClick={() => handleSave(updateEntryId ? 'update' : undefined)} disabled={saving}>
+                Guardar
+              </Button>
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -188,8 +220,14 @@ export function PatientTodayPage() {
         onClose={() => setShowOverwrite(false)}
         actions={
           <>
-            <Button variant="ghost" onClick={() => setShowOverwrite(false)}>Volver</Button>
-            <Button variant="secondary" onClick={() => handleSave('update')}>Actualizar el anterior</Button>
+            <Button variant="ghost" onClick={() => setShowOverwrite(false)}>
+              Volver
+            </Button>
+            {canMutate ? (
+              <Button variant="secondary" onClick={() => handleSave('update')}>
+                Actualizar el de hoy
+              </Button>
+            ) : null}
             <Button onClick={() => handleSave('new')}>Dejar una nueva</Button>
           </>
         }

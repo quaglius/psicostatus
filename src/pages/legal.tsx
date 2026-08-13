@@ -7,7 +7,7 @@ export function PrivacyPage() {
         <h1 className="font-display mb-6 text-3xl">Política de privacidad</h1>
         <Card className="prose space-y-4 text-[var(--ink-soft)]">
           <p>
-            Psicostatus trata datos personales y datos sensibles relacionados con el bienestar emocional de
+            Shanti trata datos personales y datos sensibles relacionados con el bienestar emocional de
             acuerdo con la Ley 25.326 de Protección de Datos Personales (Argentina).
           </p>
           <p>
@@ -32,8 +32,8 @@ export function TermsPage() {
         <h1 className="font-display mb-6 text-3xl">Términos de uso</h1>
         <Card className="space-y-4 text-[var(--ink-soft)]">
           <p>
-            Psicostatus es una herramienta de seguimiento subjetivo del estado de ánimo y bienestar. No
-            reemplaza la consulta profesional ni constituye diagnóstico o tratamiento médico.
+            Shanti es una herramienta de seguimiento del ánimo, la medicación y notas diarias, pensada para
+            psicólogos y psiquiatras. No reemplaza la consulta profesional ni constituye diagnóstico o tratamiento médico.
           </p>
           <p>
             Los profesionales son responsables del uso clínico de la información registrada por sus pacientes.

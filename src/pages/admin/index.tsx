@@ -3,6 +3,7 @@ import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { formatDateTimeAR, formatEntryPreview } from '@shared/periodicity';
+import { WORKSPACE_KIND } from '@/lib/labels';
 import type { EntryDoc, UserDoc, WorkspaceDoc } from '@shared/types';
 
 export function AdminPage() {
@@ -36,7 +37,7 @@ export function AdminPage() {
     <div className="min-h-screen bg-[var(--paper)]">
       <header className="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-4">
         <div className="mx-auto max-w-[1080px]">
-          <h1 className="font-display text-2xl">Admin — Psicostatus</h1>
+          <h1 className="font-display text-2xl">Admin — Shanti</h1>
         </div>
       </header>
 
@@ -62,7 +63,9 @@ export function AdminPage() {
             {Object.entries(overview).map(([key, val]) => (
               <Card key={key}>
                 <p className="text-3xl font-display">{val}</p>
-                <p className="text-sm capitalize text-[var(--ink-soft)]">{key}</p>
+                <p className="text-sm text-[var(--ink-soft)]">
+                  {key === 'users' ? 'Cuentas' : key === 'workspaces' ? 'Espacios' : key === 'patients' ? 'Pacientes' : 'Cargas'}
+                </p>
               </Card>
             ))}
           </div>
@@ -74,7 +77,7 @@ export function AdminPage() {
               <Card key={u.id} className="flex items-center justify-between">
                 <div>
                   <p>{u.email}</p>
-                  <p className="text-sm text-[var(--ink-soft)]">{u.platformRole}</p>
+                  <p className="text-sm text-[var(--ink-soft)]">{u.platformRole === 'global_admin' ? 'Administración de la plataforma' : 'Cuenta'}</p>
                 </div>
                 {!u.disabledAt ? (
                   <Button variant="danger" onClick={() => disableUser(u.id)}>
@@ -93,7 +96,7 @@ export function AdminPage() {
             {workspaces.map((w) => (
               <Card key={w.id}>
                 <p className="font-medium">{w.name}</p>
-                <p className="text-sm capitalize text-[var(--ink-soft)]">{w.kind}</p>
+                <p className="text-sm text-[var(--ink-soft)]">{WORKSPACE_KIND[w.kind].label}</p>
               </Card>
             ))}
           </div>

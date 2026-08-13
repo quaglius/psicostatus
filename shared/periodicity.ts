@@ -1,6 +1,10 @@
 import type { PeriodicityConfig, PeriodicityType } from './types';
 
-const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+export function todayInAR(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
 
 export function formatDateISO(date: Date): string {
   const y = date.getFullYear();

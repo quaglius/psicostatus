@@ -3,14 +3,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 import { PatientLayout } from '@/components/layout/PatientLayout';
 import { Card } from '@/components/ui/Card';
-import { formatDateTimeAR, formatEntryPreview } from '@shared/periodicity';
-import type { EntryDoc } from '@shared/types';
+import { EntryReadout } from '@/components/entry-readout';
+import { formatDateAR } from '@shared/periodicity';
+import type { EntryDoc, TemplateVersionDoc } from '@shared/types';
 
 export function PatientWeekPage() {
   const { me } = useAuth();
   const memberships = me?.patientMemberships ?? [];
   const [activeWsId, setActiveWsId] = useState('');
   const [entries, setEntries] = useState<Array<EntryDoc & { id: string }>>([]);
+  const [templateVersion, setTemplateVersion] = useState<TemplateVersionDoc | null>(null);
 
   useEffect(() => {
     if (memberships.length && !activeWsId) setActiveWsId(memberships[0]!.workspace.id);
@@ -23,6 +25,9 @@ export function PatientWeekPage() {
     apiFetch<{ entries: Array<EntryDoc & { id: string }> }>(`patients/${membership.id}/entries`).then((res) =>
       setEntries(res.entries),
     );
+    apiFetch<{ templateVersion: TemplateVersionDoc }>(`patients/${membership.id}`).then((res) =>
+      setTemplateVersion(res.templateVersion),
+    );
   }, [membership?.id]);
 
   const workspaces = memberships.map((m) => ({ id: m.workspace.id, name: m.workspace.name }));
@@ -34,18 +39,18 @@ export function PatientWeekPage() {
       activeWorkspaceId={activeWsId}
       onWorkspaceChange={setActiveWsId}
     >
-      <h1 className="font-display mb-6 text-2xl">Tu historial</h1>
-      <div className="space-y-2">
+      <h1 className="font-display mb-2 text-2xl">Tu historial</h1>
+      <p className="mb-6 text-sm text-[var(--ink-soft)]">Todo lo que fuiste cargando, completo. Los días viejos no se editan.</p>
+      <div className="space-y-3">
         {entries.length === 0 ? (
           <Card>
-            <p className="text-[var(--ink-soft)]">Todavía no hay registros.</p>
+            <p className="text-[var(--ink-soft)]">Todavía no hay registros. Cuando cargues el día, aparece acá.</p>
           </Card>
         ) : (
           entries.map((entry) => (
             <Card key={entry.id}>
-              <p className="text-sm text-[var(--ink-soft)]">{entry.entryDate}</p>
-              <p className="font-medium">{formatEntryPreview(entry.values)}</p>
-              <p className="text-xs text-[var(--ink-soft)]">Cargado: {formatDateTimeAR(entry.createdAt)}</p>
+              <p className="mb-2 text-sm font-medium">{formatDateAR(entry.entryDate)}</p>
+              <EntryReadout fields={templateVersion?.fields} entry={entry} />
             </Card>
           ))
         )}

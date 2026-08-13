@@ -143,11 +143,19 @@ export const DEFAULT_TEMPLATE_FIELDS: FieldDefinition[] = [
     config: { options: ['sad', 'ok', 'happy'] },
   },
   {
+    id: 'fld_meds',
+    type: 'select',
+    label: '¿Tomaste la medicación?',
+    required: false,
+    order: 3,
+    config: { options: ['Sí', 'No', 'No corresponde'] },
+  },
+  {
     id: 'fld_note',
     type: 'long_text',
     label: '¿Querés contar algo más?',
     required: false,
-    order: 3,
+    order: 4,
     config: { maxLength: 2000, placeholder: 'Opcional' },
   },
 ];

@@ -13,6 +13,7 @@ import {
   handleCreateTemplate,
   handleCreateTemplateVersion,
   handleCreateWorkspace,
+  handleDeleteEntry,
   handleDisableUser,
   handleGetInvite,
   handleGetMe,
@@ -25,7 +26,11 @@ import {
   handleListWorkspaceMembers,
   handlePatchEntry,
   handlePatchPatient,
+  handlePatchTemplate,
+  handlePatchWorkspace,
+  handleRemoveMember,
   handleRotateInvite,
+  handleUpload,
   handleWorkspaceOverview,
 } from './lib/handlers';
 import { authenticate, errorResponse, getPath, jsonResponse } from './lib/http';
@@ -52,6 +57,10 @@ async function route(event: HandlerEvent) {
   if (method === 'GET' && path === 'me') return handleGetMe(auth);
 
   if (method === 'POST' && path === 'workspaces') return handleCreateWorkspace(auth, event);
+  if (method === 'PATCH' && path.match(/^workspaces\/[^/]+$/)) {
+    return handlePatchWorkspace(auth, path.replace('workspaces/', ''), event);
+  }
+  if (method === 'POST' && path === 'uploads') return handleUpload(auth, event);
 
   if (method === 'POST' && path === 'invites/accept') return handleAcceptInvite(auth, event);
   if (method === 'POST' && path === 'invites') return handleCreateInvite(auth, event);
@@ -66,6 +75,10 @@ async function route(event: HandlerEvent) {
   if (method === 'GET' && path.startsWith('workspaces/') && path.endsWith('/members')) {
     const workspaceId = path.replace('workspaces/', '').replace('/members', '');
     return handleListWorkspaceMembers(auth, workspaceId);
+  }
+  if (method === 'POST' && path.match(/^workspaces\/[^/]+\/members\/[^/]+\/remove$/)) {
+    const parts = path.split('/');
+    return handleRemoveMember(auth, parts[1]!, parts[3]!);
   }
   if (method === 'GET' && path.startsWith('workspaces/') && path.endsWith('/overview')) {
     const workspaceId = path.replace('workspaces/', '').replace('/overview', '');
@@ -109,6 +122,9 @@ async function route(event: HandlerEvent) {
     return handleListTemplates(auth, workspaceId);
   }
   if (method === 'POST' && path === 'templates') return handleCreateTemplate(auth, event);
+  if (method === 'PATCH' && path.match(/^templates\/[^/]+$/)) {
+    return handlePatchTemplate(auth, path.replace('templates/', ''), event);
+  }
   if (method === 'POST' && path.match(/^templates\/[^/]+\/versions$/)) {
     const templateId = path.split('/')[1]!;
     return handleCreateTemplateVersion(auth, templateId, event);
@@ -123,6 +139,10 @@ async function route(event: HandlerEvent) {
   if (method === 'PATCH' && path.startsWith('entries/')) {
     const entryId = path.replace('entries/', '');
     return handlePatchEntry(auth, entryId, event);
+  }
+  if (method === 'DELETE' && path.startsWith('entries/')) {
+    const entryId = path.replace('entries/', '');
+    return handleDeleteEntry(auth, entryId);
   }
 
   if (method === 'GET' && path === 'admin/overview') return handleAdminOverview(auth);

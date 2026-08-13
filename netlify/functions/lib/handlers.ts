@@ -17,6 +17,7 @@ import {
   computeAdherence,
   computePeriodKey,
   formatDateISO,
+  todayInAR,
   formatEntryPreview,
   getWeekDays,
   isExpectedDay,
@@ -34,7 +35,7 @@ import {
   getWorkspaceMember,
   listVisiblePatients,
 } from './access';
-import { COLLECTIONS, getAdminAuth, getDb } from './firebase';
+import { COLLECTIONS, getAdminAuth, getBucket, getDb } from './firebase';
 import { ApiHttpError, type AuthContext, jsonResponse, parseBody, verifyBearer } from './http';
 
 async function buildMeResponse(userId: string): Promise<MeResponse> {
@@ -130,6 +131,7 @@ export async function handleCreateWorkspace(auth: AuthContext, event: HandlerEve
     kind: body.kind ?? 'solo',
     name: body.name.trim(),
     ownerUserId: auth.userId,
+    imageUrl: null,
     createdAt: nowISO(),
   };
 
@@ -139,13 +141,14 @@ export async function handleCreateWorkspace(auth: AuthContext, event: HandlerEve
     userId: auth.userId,
     role: 'admin',
     seeAllPatients: true,
+    removedAt: null,
     createdAt: nowISO(),
   };
 
   const templateId = uuidv4();
   const template: TemplateDoc = {
     workspaceId,
-    name: 'Seguimiento diario',
+    name: 'Ánimo, medicación y notas',
     isDefault: true,
     archivedAt: null,
     createdAt: nowISO(),
@@ -279,6 +282,7 @@ export async function handleAcceptInvite(auth: AuthContext, event: HandlerEvent)
       userId: auth.userId,
       role: invite.role ?? 'professional',
       seeAllPatients: invite.seeAllPatients,
+      removedAt: null,
       createdAt: nowISO(),
     };
 
@@ -344,6 +348,7 @@ export async function handleAcceptInvite(auth: AuthContext, event: HandlerEvent)
     userId: auth.userId,
     firstName: body.firstName.trim(),
     lastName: body.lastName.trim(),
+    photoUrl: null,
     birthDate: body.birthDate ?? null,
     phone: body.phone ?? null,
     internalNotes: null,
@@ -563,6 +568,7 @@ export async function handlePatchPatient(auth: AuthContext, patientId: string, e
   if (body.phone !== undefined) allowed.phone = body.phone;
   if (body.internalNotes !== undefined) allowed.internalNotes = body.internalNotes;
   if (body.archivedAt !== undefined) allowed.archivedAt = body.archivedAt;
+  if (body.photoUrl !== undefined) allowed.photoUrl = body.photoUrl;
 
   await getDb().collection(COLLECTIONS.workspacePatients).doc(patientId).update(allowed);
   return jsonResponse(200, { ok: true });
@@ -874,6 +880,9 @@ export async function handleCreateEntry(auth: AuthContext, event: HandlerEvent) 
     if (entry.workspacePatientId !== body.workspacePatientId) {
       throw new ApiHttpError(403, 'FORBIDDEN', 'No podés editar este registro');
     }
+    if (entry.entryDate !== todayInAR()) {
+      throw new ApiHttpError(403, 'NOT_TODAY', 'Solo se puede cambiar lo de hoy.');
+    }
     await existing.ref.update({ values: validatedValues, updatedAt: nowISO() });
     return jsonResponse(200, { id: existing.id, updated: true });
   }
@@ -918,6 +927,9 @@ export async function handlePatchEntry(auth: AuthContext, entryId: string, event
 
   const entry = doc.data() as EntryDoc;
   await assertCanEditPatient(auth.user, entry.workspacePatientId);
+  if (entry.entryDate !== todayInAR()) {
+    throw new ApiHttpError(403, 'NOT_TODAY', 'Solo se puede cambiar lo de hoy.');
+  }
 
   const versionDoc = await db.collection(COLLECTIONS.templateVersions).doc(entry.templateVersionId).get();
   const version = versionDoc.data() as TemplateVersionDoc;
@@ -1014,6 +1026,8 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
   const weekStart = formatDateISO(startOfWeekMonday(new Date()));
   let entriesThisWeek = 0;
   let totalAdherence = { expected: 0, filled: 0 };
+  const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
+  const weekLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   for (const p of patients) {
     const entriesSnap = await db
@@ -1022,6 +1036,12 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
       .where('entryDate', '>=', weekStart)
       .get();
     entriesThisWeek += entriesSnap.size;
+    for (const doc of entriesSnap.docs) {
+      const date = (doc.data() as EntryDoc).entryDate;
+      const d = parseISODate(date);
+      const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      weekdayCounts[idx]! += 1;
+    }
 
     const assignmentSnap = await db
       .collection(COLLECTIONS.assignments)
@@ -1083,6 +1103,7 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
         ? Math.round((totalAdherence.filled / totalAdherence.expected) * 100)
         : 0,
     inactivePatients: inactivePatients.slice(0, 10),
+    weekdayLoads: weekLabels.map((label, i) => ({ label, value: weekdayCounts[i] ?? 0 })),
   });
 }
 
@@ -1108,14 +1129,125 @@ export async function handleListWorkspaceMembers(auth: AuthContext, workspaceId:
   const db = getDb();
   const snap = await db.collection(COLLECTIONS.workspaceMembers).where('workspaceId', '==', workspaceId).get();
 
-  const members = await Promise.all(
-    snap.docs.map(async (d) => {
-      const member = { id: d.id, ...(d.data() as WorkspaceMemberDoc) };
-      const userDoc = await db.collection(COLLECTIONS.users).doc(member.userId).get();
-      const user = userDoc.data() as UserDoc;
-      return { ...member, email: user?.email, displayName: user?.displayName };
-    }),
-  );
+  const members = (
+    await Promise.all(
+      snap.docs.map(async (d) => {
+        const member = { id: d.id, ...(d.data() as WorkspaceMemberDoc) };
+        if (member.removedAt) return null;
+        const userDoc = await db.collection(COLLECTIONS.users).doc(member.userId).get();
+        const user = userDoc.data() as UserDoc;
+        return { ...member, email: user?.email, displayName: user?.displayName };
+      }),
+    )
+  ).filter(Boolean);
 
   return jsonResponse(200, { members });
+}
+
+function assertToday(entryDate: string) {
+  if (entryDate !== todayInAR()) {
+    throw new ApiHttpError(403, 'NOT_TODAY', 'Solo se puede cambiar lo de hoy.');
+  }
+}
+
+export async function handleDeleteEntry(auth: AuthContext, entryId: string) {
+  const db = getDb();
+  const doc = await db.collection(COLLECTIONS.entries).doc(entryId).get();
+  if (!doc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'Registro no encontrado');
+  const entry = doc.data() as EntryDoc;
+  await assertCanEditPatient(auth.user, entry.workspacePatientId);
+  assertToday(entry.entryDate);
+  await doc.ref.delete();
+  return jsonResponse(200, { ok: true });
+}
+
+export async function handlePatchWorkspace(auth: AuthContext, workspaceId: string, event: HandlerEvent) {
+  await assertWorkspaceAdmin(auth.user, workspaceId);
+  const body = parseBody<{ name?: string; imageUrl?: string | null }>(event);
+  const allowed: Partial<WorkspaceDoc> = {};
+  if (body.name?.trim()) allowed.name = body.name.trim();
+  if (body.imageUrl !== undefined) allowed.imageUrl = body.imageUrl;
+  if (!Object.keys(allowed).length) {
+    throw new ApiHttpError(400, 'INVALID_INPUT', 'No hay nada para guardar');
+  }
+  await getDb().collection(COLLECTIONS.workspaces).doc(workspaceId).update(allowed);
+  return jsonResponse(200, { ok: true });
+}
+
+export async function handlePatchTemplate(auth: AuthContext, templateId: string, event: HandlerEvent) {
+  const db = getDb();
+  const templateDoc = await db.collection(COLLECTIONS.templates).doc(templateId).get();
+  if (!templateDoc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'Plantilla no encontrada');
+  const template = templateDoc.data() as TemplateDoc;
+  await assertWorkspaceStaff(auth.user, template.workspaceId, ['admin', 'professional']);
+  const body = parseBody<{ name?: string }>(event);
+  if (!body.name?.trim()) throw new ApiHttpError(400, 'INVALID_INPUT', 'El nombre es obligatorio');
+  await templateDoc.ref.update({ name: body.name.trim() });
+  return jsonResponse(200, { ok: true });
+}
+
+export async function handleRemoveMember(auth: AuthContext, workspaceId: string, memberId: string) {
+  await assertWorkspaceAdmin(auth.user, workspaceId);
+  const db = getDb();
+  const doc = await db.collection(COLLECTIONS.workspaceMembers).doc(memberId).get();
+  if (!doc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'No está en el equipo');
+  const member = doc.data() as WorkspaceMemberDoc;
+  if (member.workspaceId !== workspaceId) throw new ApiHttpError(403, 'FORBIDDEN', 'No corresponde a este espacio');
+  if (member.userId === auth.userId) {
+    throw new ApiHttpError(400, 'INVALID_INPUT', 'No podés sacarte a vos mismo');
+  }
+  const others = await db.collection(COLLECTIONS.workspaceMembers).where('workspaceId', '==', workspaceId).get();
+  const activeAdmins = others.docs.filter((d) => {
+    const m = d.data() as WorkspaceMemberDoc;
+    return !m.removedAt && m.role === 'admin' && d.id !== memberId;
+  });
+  if (member.role === 'admin' && activeAdmins.length === 0) {
+    throw new ApiHttpError(400, 'LAST_ADMIN', 'Tiene que quedar al menos una persona que administre');
+  }
+  await doc.ref.update({ removedAt: nowISO() });
+  return jsonResponse(200, { ok: true });
+}
+
+export async function handleUpload(auth: AuthContext, event: HandlerEvent) {
+  const body = parseBody<{ purpose: 'workspace' | 'patient'; targetId: string; dataUrl: string }>(event);
+  if (!body.dataUrl?.startsWith('data:image/') || !body.targetId) {
+    throw new ApiHttpError(400, 'INVALID_INPUT', 'La imagen no es válida');
+  }
+
+  if (body.purpose === 'workspace') {
+    await assertWorkspaceAdmin(auth.user, body.targetId);
+  } else {
+    await assertCanEditPatient(auth.user, body.targetId);
+  }
+
+  const match = body.dataUrl.match(/^data:(image\/[\w+.-]+);base64,(.+)$/);
+  if (!match) throw new ApiHttpError(400, 'INVALID_INPUT', 'La imagen no es válida');
+  const contentType = match[1]!;
+  const buffer = Buffer.from(match[2]!, 'base64');
+  if (buffer.length > 1_500_000) {
+    throw new ApiHttpError(400, 'TOO_LARGE', 'La imagen es muy pesada. Probá con otra más chica.');
+  }
+
+  const token = uuidv4();
+  const path = `shanti/${body.purpose}/${body.targetId}/${token}.webp`;
+  try {
+    const file = getBucket().file(path);
+    await file.save(buffer, {
+      resumable: false,
+      metadata: {
+        contentType,
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
+    const url = `https://firebasestorage.googleapis.com/v0/b/${getBucket().name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+    if (body.purpose === 'workspace') {
+      await getDb().collection(COLLECTIONS.workspaces).doc(body.targetId).update({ imageUrl: url });
+    } else {
+      await getDb().collection(COLLECTIONS.workspacePatients).doc(body.targetId).update({ photoUrl: url });
+    }
+    return jsonResponse(200, { url });
+  } catch (err) {
+    console.error(err);
+    throw new ApiHttpError(500, 'UPLOAD_FAILED', 'No pudimos guardar la imagen. Si es la primera vez, hay que activar Storage en Firebase.');
+  }
 }

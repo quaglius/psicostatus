@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 let app: App;
 
@@ -26,6 +27,7 @@ function getApp(): App {
       clientEmail: serviceAccount.client_email,
       privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
     }),
+    storageBucket: `${serviceAccount.project_id}.appspot.com`,
   });
 
   return app;
@@ -37,6 +39,10 @@ export function getAdminAuth() {
 
 export function getDb() {
   return getFirestore(getApp());
+}
+
+export function getBucket() {
+  return getStorage(getApp()).bucket();
 }
 
 export const COLLECTIONS = {

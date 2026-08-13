@@ -45,7 +45,7 @@ export function FaceButton({ mood, selected, onClick, label }: FaceIconProps) {
 const FACE_LABELS: Record<string, string> = {
   sad: 'Triste',
   ok: 'Regular',
-  happy: 'Contento',
+  happy: 'Bien',
 };
 
 export function FacesField({

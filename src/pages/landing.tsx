@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom';
+import { ClipboardList, Heart, Pill, Smartphone, Monitor } from 'lucide-react';
 import { Mark } from '@/components/brand/Mark';
 import { Button } from '@/components/ui/Button';
+import { APP_NAME, APP_NAME_MEANING } from '@/lib/labels';
 import './landing.css';
 
 function Cta({ compact = false }: { compact?: boolean }) {
   return (
     <div className={compact ? 'flex items-center gap-2' : 'flex flex-wrap items-center gap-3'}>
       <Link to="/registro/profesional">
-        <Button>Empezar ahora</Button>
+        <Button>Crear mi espacio</Button>
       </Link>
       {!compact ? (
         <Link to="/ingresar">
@@ -22,29 +24,6 @@ function Cta({ compact = false }: { compact?: boolean }) {
   );
 }
 
-const FOLDS = [
-  {
-    title: 'Invitar es un link',
-    body: 'Copiás un enlace y se lo pasás por WhatsApp o mail. El paciente entra con Google o correo, pone su nombre y ya puede cargar. El link puede ser reutilizable, de un solo uso, o restringido a un mail: lo simple va primero, lo puntual está ahí si lo necesitás.',
-  },
-  {
-    title: 'Una plantilla por paciente, que puede cambiar',
-    body: 'Por defecto: del 0 al 10, tres caritas y un espacio para escribir. Si querés otra cosa, armás campos (texto, fecha, escala, lista) y una periodicidad: todos los días, ciertos días, cada N días o una vez por semana. Cuando cambiás la plantilla, lo ya cargado se conserva tal cual se registró.',
-  },
-  {
-    title: 'La semana se lee de un vistazo',
-    body: 'Una cinta de lunes a domingo. El día sin carga queda apagado; el que sí se cargó, encendido. Un reborde marca qué días se esperaba registrar, según la plantilla. Si alguien carga de más en el mismo período, elige actualizar lo anterior o dejar un registro nuevo. Siempre queda la hora real de carga.',
-  },
-  {
-    title: 'Consultorio, grupo o clínica',
-    body: 'Un profesional solo, o un equipo. El administrador ve a todos; cada profesional ve a los suyos; hay un rol de solo lectura. Se invita al equipo con un link y un rol. Un paciente puede estar en más de un espacio: cada historial queda con quien corresponde.',
-  },
-  {
-    title: 'Lo que no es',
-    body: 'No es historia clínica, no diagnostica y no reemplaza la sesión. Es un cuaderno entre una consulta y la otra. Los datos se tratan como sensibles, según la Ley 25.326.',
-  },
-];
-
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)]">
@@ -52,144 +31,131 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-[1080px] items-center justify-between gap-4 px-5 py-3">
           <Link to="/" className="flex items-center gap-2 no-underline hover:no-underline">
             <Mark size={32} />
-            <span className="font-display text-lg tracking-tight text-[var(--ink)]">Psicostatus</span>
+            <span className="font-display text-lg tracking-tight text-[var(--ink)]">{APP_NAME}</span>
           </Link>
           <Cta compact />
         </div>
       </header>
 
-      <section className="relative">
-        <img
-          src="/brand/hero-journal.png"
-          alt="Cuaderno abierto sobre un escritorio, con luz de mañana"
-          className="landing-hero-img"
-        />
-        <div className="mx-auto max-w-[720px] px-5 py-12 text-center sm:py-16">
-          <p className="mb-3 text-sm tracking-[0.14em] text-[var(--clay)] uppercase">
-            Entre una sesión y la otra
-          </p>
+      <section className="mx-auto grid max-w-[1080px] items-center gap-10 px-5 py-12 md:grid-cols-2 md:py-16">
+        <div>
+          <p className="mb-3 text-sm tracking-[0.14em] text-[var(--clay)] uppercase">Para psicólogos y psiquiatras</p>
           <h1 className="font-display text-[2.4rem] leading-[1.15] text-[var(--ink)] sm:text-5xl">
-            Cómo se siente tu paciente, día a día — sin pedirle un informe.
+            Cómo viene tu paciente, día a día — sin pedirle un informe.
           </h1>
-          <p className="mx-auto mt-5 max-w-[34rem] text-lg text-[var(--ink-soft)]">
-            Un cuaderno digital, calmo, para psicólogos y psiquiatras. El paciente carga en segundos.
-            Vos ves el hilo entre consultas.
+          <p className="mt-5 text-lg text-[var(--ink-soft)]">
+            El paciente anota en el teléfono el ánimo, si tomó la medicación y cualquier nota del día. Vos lo ves en la
+            computadora, de lo general a lo particular, antes de la sesión.
           </p>
-          <div className="mt-8 flex justify-center">
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">{APP_NAME_MEANING}</p>
+          <div className="mt-8">
             <Cta />
           </div>
+        </div>
+        <img
+          src="/brand/phone-hoy.png"
+          alt="Un teléfono con la pantalla de carga diaria: caritas y una pregunta de cómo se siente"
+          className="landing-still"
+        />
+      </section>
+
+      <section className="mx-auto max-w-[1080px] px-5 pb-16">
+        <h2 className="font-display mb-6 text-3xl">Qué puede cargar el paciente</h2>
+        <ul className="grid gap-6 md:grid-cols-3">
+          <li className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5">
+            <Heart className="mb-3 text-[var(--clay)]" />
+            <p className="font-display text-xl">Ánimo</p>
+            <p className="mt-1 text-[var(--ink-soft)]">Una escala del 0 al 10 y una carita. Cómo se siente hoy, en segundos.</p>
+          </li>
+          <li className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5">
+            <Pill className="mb-3 text-[var(--clay)]" />
+            <p className="font-display text-xl">Medicación</p>
+            <p className="mt-1 text-[var(--ink-soft)]">Sí, no, o no corresponde. Para el seguimiento entre consultas.</p>
+          </li>
+          <li className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5">
+            <ClipboardList className="mb-3 text-[var(--clay)]" />
+            <p className="font-display text-xl">Notas del día</p>
+            <p className="mt-1 text-[var(--ink-soft)]">Lo que quiera dejar escrito. Un renglón o un párrafo. Opcional.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section className="mx-auto grid max-w-[1080px] items-center gap-8 px-5 pb-16 md:grid-cols-2">
+        <img
+          src="/brand/paciente-carga.png"
+          alt="Una persona completando el registro del día en el teléfono, en su casa"
+          className="landing-still"
+        />
+        <div>
+          <Smartphone className="mb-3 text-[var(--sage)]" />
+          <p className="text-sm tracking-[0.12em] text-[var(--sage)] uppercase">Para el paciente</p>
+          <h2 className="font-display mt-2 text-3xl">Tres toques y listo.</h2>
+          <p className="mt-3 text-[var(--ink-soft)]">
+            No tiene que entender el sistema. Abre el link, crea cuenta o entra, y carga el día. Cabe en el colectivo,
+            después de una noche difícil, o a la mañana con el café.
+          </p>
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-[1080px] items-center gap-8 px-5 pb-16 md:grid-cols-2">
+        <div className="md:order-2">
+          <img
+            src="/brand/profesional-escritorio.png"
+            alt="Un profesional de salud mental frente a la computadora, viendo el tablero de sus pacientes"
+            className="landing-still"
+          />
+        </div>
+        <div>
+          <Monitor className="mb-3 text-[var(--sage)]" />
+          <p className="text-sm tracking-[0.12em] text-[var(--sage)] uppercase">Para el consultorio</p>
+          <h2 className="font-display mt-2 text-3xl">Entrá a la sesión sabiendo cómo viene.</h2>
+          <p className="mt-3 text-[var(--ink-soft)]">
+            Lista de pacientes, quién cargó y quién no, gráficos calmos y la ficha completa: todo el texto, no un recorte.
+            Sirve si atendés solo o si hay un equipo.
+          </p>
         </div>
       </section>
 
       <section className="mx-auto max-w-[1080px] px-5 pb-16">
+        <h2 className="font-display mb-8 text-3xl">Cómo se usa</h2>
         <ol className="grid gap-10 md:grid-cols-3">
           {[
             {
               n: '01',
               t: 'Armás tu espacio',
-              d: 'Consultorio, grupo o clínica. En un paso. Ya tenés una plantilla lista: escala, caritas y un renglón para escribir.',
+              d: 'Le ponés un nombre. Consultorio, grupo o clínica. Ya hay un cuestionario listo: ánimo, medicación y notas.',
             },
             {
               n: '02',
-              t: 'Pasás el link',
-              d: 'El paciente se registra solo. Google o mail. Pone su nombre. Empieza a cargar el mismo día.',
+              t: 'Le pasás un link',
+              d: 'Lo copiás y lo mandás por WhatsApp o mail. La persona crea cuenta o entra. Pone su nombre. Empieza el mismo día.',
             },
             {
               n: '03',
-              t: 'Leés la semana',
-              d: 'Quién cargó, quién no, qué dijo. Sin tablas densas. Sin gamificar el malestar.',
+              t: 'Ves la semana',
+              d: 'Quién cargó, quién no, qué dijo. Números y gráficos para vos. El paciente solo ve su día.',
             },
           ].map((item) => (
             <li key={item.n}>
               <p className="font-display text-sm text-[var(--clay)]">{item.n}</p>
-              <h2 className="font-display mt-2 text-2xl">{item.t}</h2>
+              <h3 className="font-display mt-2 text-2xl">{item.t}</h3>
               <p className="mt-2 text-[var(--ink-soft)]">{item.d}</p>
             </li>
           ))}
         </ol>
       </section>
 
-      <section className="mx-auto max-w-[1080px] px-5 pb-16">
-        <img
-          src="/brand/week-windows.png"
-          alt="Siete ventanas al atardecer, algunas con luz encendida"
-          className="landing-break-img"
-        />
-        <div className="mx-auto mt-10 max-w-[640px]">
-          <h2 className="font-display text-3xl">La semana, como una fila de ventanas.</h2>
-          <p className="mt-3 text-[var(--ink-soft)]">
-            Lunes a domingo. Lo gris es silencio; lo encendido, una carga. El reborde dice qué días se esperaba.
-            No hay racha, no hay fuego, no hay “seguí así”. Solo presencia.
-          </p>
-          <div className="landing-week mt-6 max-w-xs" aria-hidden>
-            {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d, i) => (
-              <span key={d} className={i === 0 || i === 2 || i === 3 ? 'on' : ''}>
-                {d}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-[1080px] items-stretch gap-8 px-5 pb-16 md:grid-cols-2">
-        <img
-          src="/brand/faces-still.png"
-          alt="Tres caras de cerámica sobre lino, junto a un lápiz"
-          className="landing-still"
-        />
-        <div className="flex flex-col justify-center">
-          <p className="text-sm tracking-[0.12em] text-[var(--sage)] uppercase">Para el paciente</p>
-          <h2 className="font-display mt-2 text-3xl">Un gesto, no un formulario.</h2>
-          <p className="mt-3 text-[var(--ink-soft)]">
-            Del 0 al 10. Una cara. Si quiere, una frase. Cabe en el teléfono, en el colectivo, después de una
-            noche difícil. Lo demás —plantillas, equipo, clínicas— no le aparece. No tiene que entender el
-            sistema. Solo cómo está hoy.
-          </p>
-          <div className="mt-6">
-            <Link to="/registro/profesional">
-              <Button>Quiero dárselo a mis pacientes</Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[720px] px-5 pb-16">
-        <p className="text-sm tracking-[0.12em] text-[var(--clay)] uppercase">Si querés el detalle</p>
-        <h2 className="font-display mt-2 mb-2 text-3xl">Qué puede hacer, sin el ruido.</h2>
-        <p className="mb-6 text-[var(--ink-soft)]">
-          Lo esencial ya está arriba. Acá está el resto, plegado. Abrí solo lo que te interese.
+      <section className="mx-auto max-w-[640px] px-5 pb-16 text-center">
+        <h2 className="font-display text-3xl">La semana, de un vistazo</h2>
+        <p className="mt-3 text-[var(--ink-soft)]">
+          Lun a Dom. La tilde es “ya cargó”. El círculo vacío es “se esperaba y no llegó”. Tocás un día y leés todo.
         </p>
-        {FOLDS.map((fold) => (
-          <details key={fold.title} className="landing-fold">
-            <summary>{fold.title}</summary>
-            <p className="fold-body">{fold.body}</p>
-          </details>
-        ))}
-      </section>
-
-      <section className="mx-auto max-w-[1080px] px-5 pb-16">
-        <div className="grid items-center gap-8 md:grid-cols-2">
-          <div>
-            <p className="text-sm tracking-[0.12em] text-[var(--sage)] uppercase">Para el consultorio</p>
-            <h2 className="font-display mt-2 text-3xl">Llegás a la sesión con el hilo, no con la amnesia de siete días.</h2>
-            <p className="mt-3 text-[var(--ink-soft)]">
-              Una lista aireada. Una ficha. La misma cinta que ve el paciente. El texto que escribió el martes
-              a las 21:04. Sirve para el que atiende solo y para la clínica que reparte roles.
-            </p>
-            <ul className="mt-5 space-y-2 text-[var(--ink-soft)]">
-              <li>— Adherencia en un número chico: 4/7, no un gráfico de torta.</li>
-              <li>— Equipo: admin, profesional, solo lectura.</li>
-              <li>— Historial intacto aunque cambie la plantilla.</li>
-            </ul>
-            <div className="mt-6">
-              <Cta />
-            </div>
-          </div>
-          <img
-            src="/brand/consultorio.png"
-            alt="Consultorio vacío, dos sillas y un cuaderno sobre la mesa"
-            className="landing-still"
-          />
+        <div className="landing-week mx-auto mt-6 max-w-md" aria-hidden>
+          {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d, i) => (
+            <span key={d} className={i === 0 || i === 2 || i === 3 ? 'on' : ''}>
+              {d}
+            </span>
+          ))}
         </div>
       </section>
 
@@ -201,7 +167,7 @@ export function LandingPage() {
             El primer paciente entra con un link.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-[var(--ink-soft)]">
-            Gratis para empezar. Mail o Google. En un par de clics tenés consultorio y plantilla.
+            Gratis para empezar. Mail o Google. En un par de clics tenés consultorio y cuestionario.
           </p>
           <div className="mt-8 flex justify-center">
             <Link to="/registro/profesional">
@@ -222,10 +188,10 @@ export function LandingPage() {
           <div className="flex items-start gap-3">
             <Mark size={28} />
             <div>
-              <p className="font-display text-lg">Psicostatus</p>
+              <p className="font-display text-lg">{APP_NAME}</p>
               <p className="max-w-xs text-sm text-[var(--ink-soft)]">
-                Herramienta de seguimiento. No es historia clínica ni diagnóstico. El profesional es responsable
-                del uso clínico.
+                {APP_NAME_MEANING} Herramienta de seguimiento para psicólogos y psiquiatras. No es historia clínica ni
+                diagnóstico. El profesional es responsable del uso clínico.
               </p>
             </div>
           </div>

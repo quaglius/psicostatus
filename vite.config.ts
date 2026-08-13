@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Psicostatus',
-        short_name: 'Psicostatus',
-        description: 'Seguimiento diario de tu bienestar',
+        name: 'Shanti',
+        short_name: 'Shanti',
+        description: 'Seguimiento de ánimo, medicación y notas para psicólogos y psiquiatras',
         theme_color: '#F4EFE6',
         background_color: '#F4EFE6',
         display: 'standalone',

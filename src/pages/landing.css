@@ -82,11 +82,12 @@
 }
 
 .landing-week span {
-  aspect-ratio: 1;
-  border-radius: 999px;
+  min-height: 52px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  padding: 8px 2px;
   color: var(--ink-soft);
   background: var(--empty);
 }

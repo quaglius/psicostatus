@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { ImagePicker } from '@/components/image-picker';
+import { WORKSPACE_KIND } from '@/lib/labels';
 import type { WorkspaceKind } from '@shared/types';
 
 export function OnboardingPage() {
@@ -12,6 +14,7 @@ export function OnboardingPage() {
   const { me, loading, refreshMe } = useAuth();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<WorkspaceKind>('solo');
+  const [image, setImage] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
@@ -41,10 +44,20 @@ export function OnboardingPage() {
     setFormLoading(true);
     setError('');
     try {
-      const res = await apiFetch<{ patientInviteToken: string }>('workspaces', {
+      const res = await apiFetch<{ patientInviteToken: string; workspace: { id: string } }>('workspaces', {
         method: 'POST',
         body: JSON.stringify({ name, kind }),
       });
+      if (image && res.workspace?.id) {
+        try {
+          await apiFetch('uploads', {
+            method: 'POST',
+            body: JSON.stringify({ purpose: 'workspace', targetId: res.workspace.id, dataUrl: image }),
+          });
+        } catch {
+          // El espacio ya está creado; la foto se puede cargar después.
+        }
+      }
       await refreshMe();
       const url = `${window.location.origin}/i/${res.patientInviteToken}`;
       setInviteUrl(url);
@@ -61,34 +74,51 @@ export function OnboardingPage() {
       <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] px-4">
         <Card className="w-full max-w-md space-y-4 text-center">
           <h1 className="font-display text-2xl">¡Listo!</h1>
-          <p className="text-[var(--ink-soft)]">Tu espacio está creado. Copiamos el link de invitación para pacientes.</p>
+          <p className="text-[var(--ink-soft)]">
+            Tu espacio está creado. Ya copiamos el link para invitar pacientes: pegalo en WhatsApp o mail.
+          </p>
           <p className="break-all text-xs text-[var(--ink-soft)]">{inviteUrl}</p>
-          <Button fullWidth onClick={() => navigate('/pro/pacientes')}>Ir a pacientes</Button>
+          <Button fullWidth onClick={() => navigate('/pro/pacientes')}>
+            Ir a pacientes
+          </Button>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] px-4 py-10">
       <Card className="w-full max-w-md space-y-5">
         <div>
           <h1 className="font-display text-2xl">Tu espacio de trabajo</h1>
-          <p className="text-sm text-[var(--ink-soft)]">Un paso y ya podés invitar pacientes.</p>
+          <p className="text-sm text-[var(--ink-soft)]">
+            Es el consultorio digital. Un nombre, un tipo, y si querés una foto. Después invitás pacientes con un link.
+          </p>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Input label="Nombre del espacio" value={name} onChange={(e) => setName(e.target.value)} required />
 
           <fieldset className="space-y-2">
-            <legend className="text-sm text-[var(--ink-soft)]">Tipo</legend>
-            {(['solo', 'grupo', 'clinica'] as WorkspaceKind[]).map((k) => (
-              <label key={k} className="flex items-center gap-2">
-                <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} />
-                <span className="capitalize">{k}</span>
+            <legend className="text-sm text-[var(--ink-soft)]">¿Cómo trabajás?</legend>
+            {(Object.keys(WORKSPACE_KIND) as WorkspaceKind[]).map((k) => (
+              <label key={k} className="flex items-start gap-2 rounded-[var(--radius-input)] border border-[var(--line)] p-3">
+                <input type="radio" name="kind" className="mt-1" value={k} checked={kind === k} onChange={() => setKind(k)} />
+                <span>
+                  <span className="font-medium">{WORKSPACE_KIND[k].label}</span>
+                  <span className="block text-sm text-[var(--ink-soft)]">{WORKSPACE_KIND[k].help}</span>
+                </span>
               </label>
             ))}
           </fieldset>
+
+          <ImagePicker
+            label="Foto o logo"
+            help="Opcional. Se puede cargar después."
+            name={name || 'Espacio'}
+            value={image}
+            onChange={setImage}
+          />
 
           {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 

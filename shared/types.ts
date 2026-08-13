@@ -43,6 +43,7 @@ export interface WorkspaceDoc {
   kind: WorkspaceKind;
   name: string;
   ownerUserId: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -51,6 +52,7 @@ export interface WorkspaceMemberDoc {
   userId: string;
   role: WorkspaceMemberRole;
   seeAllPatients: boolean;
+  removedAt?: string | null;
   createdAt: string;
 }
 
@@ -59,6 +61,7 @@ export interface WorkspacePatientDoc {
   userId: string;
   firstName: string;
   lastName: string;
+  photoUrl?: string | null;
   birthDate: string | null;
   phone: string | null;
   internalNotes: string | null;

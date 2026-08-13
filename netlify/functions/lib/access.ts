@@ -21,7 +21,9 @@ export async function getWorkspaceMember(
     .get();
   if (snap.empty) return null;
   const doc = snap.docs[0]!;
-  return { id: doc.id, ...(doc.data() as WorkspaceMemberDoc) };
+  const member = { id: doc.id, ...(doc.data() as WorkspaceMemberDoc) };
+  if (member.removedAt) return null;
+  return member;
 }
 
 export async function getWorkspacePatient(
@@ -124,6 +126,7 @@ export async function assertWorkspaceAdmin(
       userId: authUser.id,
       role: 'admin',
       seeAllPatients: true,
+      removedAt: null,
       createdAt: new Date().toISOString(),
     };
   }
@@ -147,6 +150,7 @@ export async function assertWorkspaceStaff(
       userId: authUser.id,
       role: 'admin',
       seeAllPatients: true,
+      removedAt: null,
       createdAt: new Date().toISOString(),
     };
   }
