@@ -1,13 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "firebaseUid", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "workspaceMembers",
       "queryScope": "COLLECTION",
       "fields": [
@@ -52,6 +45,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "workspacePatientId", "order": "ASCENDING" },
+        { "fieldPath": "entryDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "entries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "workspacePatientId", "order": "ASCENDING" },
         { "fieldPath": "periodKey", "order": "ASCENDING" }
       ]
     },
@@ -60,14 +61,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "workspacePatientId", "order": "ASCENDING" },
-        { "fieldPath": "entryDate", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "inviteLinks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "tokenHash", "order": "ASCENDING" }
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
