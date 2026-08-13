@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --paper: #f4efe6;
+  --surface: #fff9f1;
+  --ink: #3a322c;
+  --ink-soft: #7a7068;
+  --line: #e4d9cc;
+  --sage: #6e8b74;
+  --sage-soft: #dde6dc;
+  --clay: #c4785a;
+  --clay-soft: #f0d9cf;
+  --warn: #a6844c;
+  --danger: #9c4a3c;
+  --empty: #e8dfd4;
+  --radius-card: 18px;
+  --radius-input: 12px;
+  --shadow-soft: 0 1px 0 rgba(58, 50, 44, 0.04), 0 8px 24px rgba(58, 50, 44, 0.06);
+  --motion: 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: var(--sage);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
