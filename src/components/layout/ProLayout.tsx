@@ -10,10 +10,10 @@ interface ProLayoutProps {
 }
 
 const NAV = [
-  { to: '/pro/espacio', label: 'Espacio', help: 'El tablero de tu consultorio' },
-  { to: '/pro/pacientes', label: 'Pacientes', help: 'Quiénes están a tu cargo' },
-  { to: '/pro/plantillas', label: 'Plantillas', help: 'Qué les pedís cargar' },
-  { to: '/pro/equipo', label: 'Equipo', help: 'Quién trabaja acá' },
+  { to: '/pro/espacio', label: 'Espacio', help: 'El tablero de tu consultorio', tour: 'nav-espacio' },
+  { to: '/pro/pacientes', label: 'Pacientes', help: 'Quiénes están a tu cargo', tour: 'nav-pacientes' },
+  { to: '/pro/plantillas', label: 'Plantillas', help: 'Qué les pedís cargar', tour: 'nav-plantillas' },
+  { to: '/pro/equipo', label: 'Equipo', help: 'Quién trabaja acá', tour: 'nav-equipo' },
 ];
 
 export function ProLayout({ children, workspaceName }: ProLayoutProps) {
@@ -40,6 +40,7 @@ export function ProLayout({ children, workspaceName }: ProLayoutProps) {
                   key={item.to}
                   to={item.to}
                   title={item.help}
+                  data-tour={item.tour}
                   className={[
                     'rounded-full px-4 py-2 text-sm transition-colors hover:bg-[var(--sage-soft)] hover:text-[var(--ink)] hover:no-underline',
                     active ? 'bg-[var(--sage-soft)] text-[var(--ink)]' : 'text-[var(--ink-soft)]',

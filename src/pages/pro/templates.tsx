@@ -10,6 +10,8 @@ import { PageSkeleton } from '@/components/skeleton';
 import { PeriodicityIcon } from '@/lib/field-icons';
 import { PERIODICITY } from '@/lib/labels';
 import { ListToolbar, Pagination, SortHeader, usePagedSort, type SortDir } from '@/components/paged-list';
+import { GuidedTour, TourReplay } from '@/components/guided-tour';
+import { TEMPLATES_TOUR_STEPS, TOUR_TEMPLATES } from '@/lib/tours';
 import type { TemplateDoc, TemplateVersionDoc } from '@shared/types';
 
 type TemplateRow = TemplateDoc & { id: string; latestVersion?: (TemplateVersionDoc & { id: string }) | null };
@@ -22,28 +24,53 @@ export function TemplatesPage() {
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-  useEffect(() => {
+  const load = () => {
     if (!workspace) return;
     apiFetch<{ templates: TemplateRow[] }>(`workspaces/${workspace.workspace.id}/templates`)
       .then((res) => setTemplates(res.templates))
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    load();
   }, [workspace?.workspace.id]);
+
+  const setDefault = async (id: string) => {
+    await apiFetch(`templates/${id}/default`, { method: 'POST', body: '{}' });
+    load();
+  };
 
   return (
     <ProLayout workspaceName={workspace?.workspace.name}>
+      <GuidedTour
+        tourId={TOUR_TEMPLATES}
+        userId={me?.user.id}
+        steps={TEMPLATES_TOUR_STEPS}
+        autoStartPath="/pro/plantillas"
+      />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div data-tour="templates-intro">
           <h1 className="font-display text-3xl">Plantillas</h1>
           <p className="mt-1 max-w-xl text-sm text-[var(--ink-soft)]">
             Una plantilla es el cuestionario del paciente: ánimo, medicación, notas, lo que armes. Podés tener varias y asignar una distinta a cada persona.
           </p>
         </div>
-        <Link to="/pro/plantillas/nueva" className="hover:no-underline">
-          <Button>
-            <Plus size={18} /> Nueva plantilla
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <TourReplay tourId={TOUR_TEMPLATES} label="Ver guía" />
+          <Link to="/pro/plantillas/nueva" className="hover:no-underline" data-tour="templates-new">
+            <Button>
+              <Plus size={18} /> Nueva plantilla
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      <p className="mb-4 max-w-2xl text-sm text-[var(--ink-soft)]" data-tour="templates-default">
+        “Usar por defecto” hace que los pacientes nuevos reciban esa plantilla. Después podés cambiarla persona por persona en su ficha.
+      </p>
+      <p className="mb-6 max-w-2xl text-sm text-[var(--ink-soft)]" data-tour="templates-per-patient">
+        En la ficha de cada paciente, en “Cambiar el cuestionario”, elegís qué formulario usa esa persona.
+      </p>
 
       {templates === null ? (
         <PageSkeleton />
@@ -66,7 +93,13 @@ export function TemplatesPage() {
               }
             }}
           />
-          <TemplatePagedList templates={templates} search={search} sortKey={sortKey} sortDir={sortDir} />
+          <TemplatePagedList
+            templates={templates}
+            search={search}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSetDefault={setDefault}
+          />
         </>
       )}
     </ProLayout>
@@ -78,11 +111,13 @@ function TemplatePagedList({
   search,
   sortKey,
   sortDir,
+  onSetDefault,
 }: {
   templates: TemplateRow[];
   search: string;
   sortKey: string;
   sortDir: SortDir;
+  onSetDefault: (id: string) => void;
 }) {
   const { pageItems, page, setPage, pageCount, total } = usePagedSort(templates, {
     search,
@@ -98,26 +133,35 @@ function TemplatePagedList({
 
   return (
     <>
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour="templates-list">
         {pageItems.map((t) => (
-          <Link key={t.id} to={`/pro/plantillas/${t.id}`} className="block hover:no-underline">
-            <Card className="flex items-center justify-between gap-3 transition-transform duration-200 hover:-translate-y-0.5">
-              <div className="flex items-start gap-3">
-                <ClipboardList className="mt-1 text-[var(--sage)]" size={22} />
-                <div>
-                  <p className="font-medium">{t.name}</p>
-                  {t.isDefault ? <p className="text-xs text-[var(--sage)]">La que se usa al invitar, si no elegís otra</p> : null}
-                  {t.latestVersion ? (
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-soft)]">
-                      <PeriodicityIcon type={t.latestVersion.periodicityType} size={16} />
-                      {PERIODICITY[t.latestVersion.periodicityType].label} · {t.latestVersion.fields.length} preguntas
-                    </p>
-                  ) : null}
-                </div>
+          <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3 transition-transform duration-200 hover:-translate-y-0.5">
+            <Link to={`/pro/plantillas/${t.id}`} className="flex min-w-0 flex-1 items-start gap-3 hover:no-underline">
+              <ClipboardList className="mt-1 text-[var(--sage)]" size={22} />
+              <div>
+                <p className="font-medium">{t.name}</p>
+                {t.isDefault ? <p className="text-xs text-[var(--sage)]">La que reciben los pacientes nuevos</p> : null}
+                {t.latestVersion ? (
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-soft)]">
+                    <PeriodicityIcon type={t.latestVersion.periodicityType} size={16} />
+                    {PERIODICITY[t.latestVersion.periodicityType].label} · {t.latestVersion.fields.length} preguntas
+                  </p>
+                ) : null}
               </div>
-              <span className="text-sm text-[var(--sage)]">Editar</span>
-            </Card>
-          </Link>
+            </Link>
+            <div className="flex items-center gap-2">
+              {t.isDefault ? (
+                <span className="text-sm text-[var(--sage)]">Por defecto</span>
+              ) : (
+                <Button variant="secondary" onClick={() => onSetDefault(t.id)}>
+                  Usar por defecto
+                </Button>
+              )}
+              <Link to={`/pro/plantillas/${t.id}`} className="text-sm text-[var(--sage)] hover:no-underline">
+                Editar
+              </Link>
+            </div>
+          </Card>
         ))}
       </div>
       <Pagination page={page} pageCount={pageCount} total={total} onPage={setPage} />

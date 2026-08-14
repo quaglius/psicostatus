@@ -14,6 +14,8 @@ import { DateRange } from '@/components/date-range';
 import { FieldReports } from '@/components/field-reports';
 import { PageSkeleton } from '@/components/skeleton';
 import { WORKSPACE_KIND } from '@/lib/labels';
+import { GuidedTour, TourReplay } from '@/components/guided-tour';
+import { PRO_TOUR_STEPS, TOUR_PRO } from '@/lib/tours';
 import { addDays, formatDateISO, todayInAR } from '@shared/periodicity';
 import type { WorkspaceKind } from '@shared/types';
 import type { FieldReport } from '@shared/report';
@@ -107,10 +109,16 @@ export function WorkspacePage() {
 
   return (
     <ProLayout workspaceName={workspace?.name}>
-      <h1 className="font-display text-3xl">Tu espacio</h1>
-      <p className="mb-6 mt-1 max-w-xl text-sm text-[var(--ink-soft)]">
-        El tablero del consultorio: cómo viene el grupo, y atajos a lo que usás todos los días.
-      </p>
+      <GuidedTour tourId={TOUR_PRO} userId={me?.user.id} steps={PRO_TOUR_STEPS} autoStartPath="/pro/espacio" />
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3" data-tour="espacio-tablero">
+        <div>
+          <h1 className="font-display text-3xl">Tu espacio</h1>
+          <p className="mt-1 max-w-xl text-sm text-[var(--ink-soft)]">
+            El tablero del consultorio: cómo viene el grupo, y atajos a lo que usás todos los días.
+          </p>
+        </div>
+        <TourReplay tourId={TOUR_PRO} label="Ver guía" />
+      </div>
 
       {workspace ? (
         <Card className="mb-6 space-y-4">

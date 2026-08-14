@@ -78,7 +78,7 @@ export function OnboardingPage() {
             Tu espacio está creado. Ya copiamos el link para invitar pacientes: pegalo en WhatsApp o mail.
           </p>
           <p className="break-all text-xs text-[var(--ink-soft)]">{inviteUrl}</p>
-          <Button fullWidth onClick={() => navigate('/pro/espacio')}>
+          <Button fullWidth onClick={() => navigate('/pro/espacio?tour=pro&paso=1')}>
             Ir a tu espacio
           </Button>
         </Card>

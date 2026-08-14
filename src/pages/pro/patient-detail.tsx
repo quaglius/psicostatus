@@ -54,6 +54,7 @@ export function PatientDetailPage() {
     id: string;
     workspaceId: string;
     photoUrl?: string | null;
+    archivedAt?: string | null;
   } | null>(null);
   const [week, setWeek] = useState<{ days: WeekDayInfo[]; periodicityType: PeriodicityType } | null>(null);
   const [entries, setEntries] = useState<Array<EntryDoc & { id: string }>>([]);
@@ -91,7 +92,7 @@ export function PatientDetailPage() {
     if (!id) return;
     const [detail, weekRes, entriesRes, notesRes] = await Promise.all([
       apiFetch<{
-        patient: { firstName: string; lastName: string; id: string; workspaceId: string; photoUrl?: string | null };
+        patient: { firstName: string; lastName: string; id: string; workspaceId: string; photoUrl?: string | null; archivedAt?: string | null };
         templateVersion: TemplateVersionDoc & { id: string };
         careTeam: Array<{ id: string; memberUserId: string; canEdit: boolean }>;
       }>(`patients/${id}`),
@@ -171,6 +172,15 @@ export function PatientDetailPage() {
     await load();
   };
 
+  const toggleActive = async () => {
+    if (!id || !patient) return;
+    await apiFetch(`patients/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archivedAt: patient.archivedAt ? null : new Date().toISOString() }),
+    });
+    await load();
+  };
+
   const isAdmin = workspace?.role === 'admin' || me?.user.platformRole === 'global_admin';
   const fields = templateVersion?.fields as FieldDefinition[] | undefined;
   const last = entries[0];
@@ -227,6 +237,7 @@ export function PatientDetailPage() {
         <Avatar name={fullName} src={pendingPhoto ?? patient.photoUrl} size={64} />
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-3xl">{fullName}</h1>
+          {patient.archivedAt ? <p className="text-sm text-[var(--warn)]">Está inactivo. No aparece en la lista de activos.</p> : null}
           <p className="text-sm text-[var(--ink-soft)]">
             {last
               ? `Última carga: ${formatDateAR(last.entryDate)}`
@@ -236,6 +247,9 @@ export function PatientDetailPage() {
             <p className="text-sm text-[var(--warn)]">Lleva {daysWithout} días sin cargar.</p>
           ) : null}
         </div>
+        <Button variant={patient.archivedAt ? 'secondary' : 'ghost'} onClick={() => void toggleActive()}>
+          {patient.archivedAt ? 'Activar' : 'Desactivar'}
+        </Button>
       </div>
 
       <nav className="mb-6 flex flex-wrap gap-1 rounded-full bg-[var(--empty)] p-1">
@@ -338,9 +352,9 @@ export function PatientDetailPage() {
           </div>
 
           {isAdmin ? (
-            <Card className="mb-8 space-y-3">
+            <Card className="mb-8 space-y-3" data-tour="patient-template">
               <h2 className="font-display text-lg">Cambiar el cuestionario</h2>
-              <p className="text-sm text-[var(--ink-soft)]">Lo ya cargado se conserva. A partir de hoy usa la plantilla nueva.</p>
+              <p className="text-sm text-[var(--ink-soft)]">Lo ya cargado se conserva. A partir de hoy usa la plantilla nueva. Si no elegís nada, los nuevos usan la plantilla marcada por defecto en Plantillas.</p>
               <select
                 className="w-full rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
                 value={selectedTemplate}

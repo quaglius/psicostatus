@@ -32,6 +32,7 @@ import {
   handlePatchEntry,
   handlePatchPatient,
   handlePatchTemplate,
+  handleSetDefaultTemplate,
   handlePatchWorkspace,
   handleRemoveMember,
   handleRotateInvite,
@@ -155,6 +156,10 @@ async function route(event: HandlerEvent) {
   }
   if (method === 'PATCH' && path.match(/^templates\/[^/]+$/)) {
     return handlePatchTemplate(auth, path.replace('templates/', ''), event);
+  }
+  if (method === 'POST' && path.match(/^templates\/[^/]+\/default$/)) {
+    const templateId = path.split('/')[1]!;
+    return handleSetDefaultTemplate(auth, templateId);
   }
   if (method === 'POST' && path.match(/^templates\/[^/]+\/versions$/)) {
     const templateId = path.split('/')[1]!;

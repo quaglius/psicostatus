@@ -165,6 +165,7 @@ export async function assertWorkspaceStaff(
 export async function listVisiblePatients(
   authUser: UserDoc & { id: string },
   workspaceId: string,
+  includeArchived = false,
 ): Promise<Array<WorkspacePatientDoc & { id: string }>> {
   const db = getDb();
   const snap = await db
@@ -173,16 +174,17 @@ export async function listVisiblePatients(
     .get();
 
   const patients = snap.docs.map((d) => ({ id: d.id, ...(d.data() as WorkspacePatientDoc) }));
+  const scoped = includeArchived ? patients : patients.filter((p) => !p.archivedAt);
 
   if (authUser.platformRole === 'global_admin') {
-    return patients.filter((p) => !p.archivedAt);
+    return scoped;
   }
 
   const member = await getWorkspaceMember(workspaceId, authUser.id);
   if (!member) return [];
 
   if (member.role === 'admin' || member.seeAllPatients) {
-    return patients.filter((p) => !p.archivedAt);
+    return scoped;
   }
 
   const careSnap = await db
@@ -192,5 +194,5 @@ export async function listVisiblePatients(
     .get();
 
   const patientIds = new Set(careSnap.docs.map((d) => (d.data() as CareTeamDoc).workspacePatientId));
-  return patients.filter((p) => !p.archivedAt && patientIds.has(p.id));
+  return scoped.filter((p) => patientIds.has(p.id));
 }

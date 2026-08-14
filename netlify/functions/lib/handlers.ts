@@ -491,7 +491,7 @@ export async function handleRotateInvite(auth: AuthContext, inviteId: string) {
 
 export async function handleListPatients(auth: AuthContext, workspaceId: string) {
   await assertWorkspaceStaff(auth.user, workspaceId);
-  const patients = await listVisiblePatients(auth.user, workspaceId);
+  const patients = await listVisiblePatients(auth.user, workspaceId, true);
   const db = getDb();
 
   const enriched = await Promise.all(
@@ -1352,6 +1352,21 @@ export async function handlePatchTemplate(auth: AuthContext, templateId: string,
   const body = parseBody<{ name?: string }>(event);
   if (!body.name?.trim()) throw new ApiHttpError(400, 'INVALID_INPUT', 'El nombre es obligatorio');
   await templateDoc.ref.update({ name: body.name.trim() });
+  return jsonResponse(200, { ok: true });
+}
+
+export async function handleSetDefaultTemplate(auth: AuthContext, templateId: string) {
+  const db = getDb();
+  const templateDoc = await db.collection(COLLECTIONS.templates).doc(templateId).get();
+  if (!templateDoc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'Plantilla no encontrada');
+  const template = templateDoc.data() as TemplateDoc;
+  await assertWorkspaceStaff(auth.user, template.workspaceId, ['admin', 'professional']);
+  const snap = await db.collection(COLLECTIONS.templates).where('workspaceId', '==', template.workspaceId).get();
+  const batch = db.batch();
+  for (const d of snap.docs) {
+    batch.update(d.ref, { isDefault: d.id === templateId });
+  }
+  await batch.commit();
   return jsonResponse(200, { ok: true });
 }
 
