@@ -96,17 +96,32 @@ export function EntryForm({ fields, values, onChange, errors = {} }: EntryFormPr
           ) : null}
 
           {field.type === 'yes_no' ? (
-            <label className="flex cursor-pointer items-center gap-3 rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
-              <input
-                type="checkbox"
-                className="h-6 w-6 accent-[var(--sage)]"
-                checked={values[field.id] === true || values[field.id] === 'true' || values[field.id] === 'Sí'}
-                onChange={(e) => setValue(field.id, e.target.checked)}
-              />
-              <span className="text-lg">
-                {values[field.id] === true || values[field.id] === 'true' || values[field.id] === 'Sí' ? 'Sí' : 'No'}
-              </span>
-            </label>
+            <div className="flex gap-3">
+              {([
+                { label: 'Sí', value: true },
+                { label: 'No', value: false },
+              ] as const).map((opt) => {
+                const current = values[field.id];
+                const isYes = current === true || current === 'true' || current === 'Sí';
+                const isNo = current === false || current === 'false' || current === 'No';
+                const active = opt.value ? isYes : isNo;
+                return (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    onClick={() => setValue(field.id, opt.value)}
+                    className={[
+                      'flex-1 rounded-[var(--radius-input)] border px-4 py-4 text-lg transition-colors',
+                      active
+                        ? 'border-[var(--sage)] bg-[var(--sage-soft)] font-medium text-[var(--ink)]'
+                        : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink-soft)]',
+                    ].join(' ')}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           ) : null}
 
           {errors[field.id] ? (

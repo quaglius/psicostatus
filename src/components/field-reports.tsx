@@ -49,7 +49,7 @@ export function FieldReports({ reports, emptyHint }: { reports: FieldReport[]; e
               </div>
               <PieChart
                 title="Cómo se reparte"
-                help="Marcado es sí, vacío es no. Sirve para ver si predomina uno."
+                help="Cada opción es un botón. Sirve para ver si predomina Sí o No."
                 slices={r.slices}
               />
             </>

@@ -11,7 +11,7 @@ interface EntryReadoutProps {
 
 function formatValue(field: FieldDefinition, raw: unknown): string {
   if (raw === undefined || raw === null || raw === '') return 'Sin respuesta';
-  if (field.type === 'yes_no') return raw === true || raw === 'true' || raw === 'Sí' ? 'Sí' : 'No';
+  if (field.type === 'yes_no') return raw === true || raw === 'true' || raw === 'Sí' || raw === 'Si' ? 'Sí' : 'No';
   if (field.type === 'faces') return FACE_LABELS[String(raw)] ?? String(raw);
   if (field.type === 'scale') return `${raw} de ${Number(field.config.max ?? 10)}`;
   return String(raw);

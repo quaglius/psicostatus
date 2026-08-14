@@ -273,7 +273,7 @@ export function TemplateEditorPage() {
                     />
                   ) : null}
                   {f.type === 'yes_no' ? (
-                    <p className="text-sm text-[var(--ink-soft)]">El paciente ve un tilde: marcado es sí, vacío es no.</p>
+                    <p className="text-sm text-[var(--ink-soft)]">El paciente elige Sí o No con dos botones.</p>
                   ) : (
                     <label className="flex items-center gap-2 text-sm">
                       <input

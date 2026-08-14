@@ -83,7 +83,7 @@ export const FIELD_TYPE: Record<FieldType, { label: string; help: string }> = {
   },
   yes_no: {
     label: 'Sí / No',
-    help: 'Un tilde. Marcado es sí, vacío es no.',
+    help: 'El paciente elige Sí o No con dos botones.',
   },
 };
 

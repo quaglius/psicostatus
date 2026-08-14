@@ -77,7 +77,7 @@ export function validateEntryValues(
       throw new Error(`El campo "${field.label}" es obligatorio`);
     }
     if (field.type === 'yes_no') {
-      result[field.id] = value === true || value === 'true' || value === 'Sí';
+      result[field.id] = value === true || value === 'true' || value === 'Sí' || value === 'Si';
       continue;
     }
     if (value === undefined || value === null || value === '') {

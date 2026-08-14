@@ -43,7 +43,7 @@ export function weekdayCounts(entries: EntryDoc[]): ReportSlice[] {
 
 export function formatReportValue(field: FieldDefinition, raw: unknown): string {
   if (raw === undefined || raw === null || raw === '') return '';
-  if (field.type === 'yes_no') return raw === true || raw === 'true' || raw === 'Sí' ? 'Sí' : 'No';
+  if (field.type === 'yes_no') return raw === true || raw === 'true' || raw === 'Sí' || raw === 'Si' ? 'Sí' : 'No';
   if (field.type === 'faces') return FACE_ES[String(raw)] ?? String(raw);
   return String(raw);
 }
@@ -90,7 +90,7 @@ export function buildFieldReports(entries: EntryDoc[], fields: FieldDefinition[]
         if (raw === undefined || raw === null || raw === '') continue;
         answerCount += 1;
         if (field.type === 'yes_no') {
-          const yes = raw === true || raw === 'true' || raw === 'Sí';
+          const yes = raw === true || raw === 'true' || raw === 'Sí' || raw === 'Si';
           if (yes) yesCount += 1;
           else noCount += 1;
           const key = yes ? 'Sí' : 'No';
