@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { NavLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiFetch, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Sheet } from '@/components/ui/Sheet';
 import { Avatar } from '@/components/avatar';
 import { EntryReadout } from '@/components/entry-readout';
+import { EntryNotes } from '@/components/entry-notes';
 import { AdherenceRing } from '@/components/charts';
 import { ImagePicker } from '@/components/image-picker';
 import { DateRange } from '@/components/date-range';
@@ -39,7 +40,6 @@ interface MemberOption {
 const TABS = [
   { to: '', label: 'Ficha', end: true },
   { to: '/historial', label: 'Historial' },
-  { to: '/notas', label: 'Notas' },
   { to: '/equipo', label: 'Equipo' },
 ];
 
@@ -69,14 +69,10 @@ export function PatientDetailPage() {
   const [canEditNew, setCanEditNew] = useState(true);
   const [pendingPhoto, setPendingPhoto] = useState<string | null>(null);
   const [notes, setNotes] = useState<Array<ProfessionalNoteDoc & { id: string }>>([]);
-  const [noteBody, setNoteBody] = useState('');
   const [loading, setLoading] = useState(true);
   const [histSearch, setHistSearch] = useState('');
   const [histSort, setHistSort] = useState('date');
   const [histDir, setHistDir] = useState<SortDir>('desc');
-  const [noteSearch, setNoteSearch] = useState('');
-  const [noteSort] = useState('date');
-  const [noteDir, setNoteDir] = useState<SortDir>('desc');
   const [assigning, setAssigning] = useState(false);
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
 
@@ -183,10 +179,9 @@ export function PatientDetailPage() {
     await load();
   };
 
-  const addNote = async () => {
-    if (!id || !noteBody.trim()) return;
-    await apiFetch(`patients/${id}/notes`, { method: 'POST', body: JSON.stringify({ body: noteBody }) });
-    setNoteBody('');
+  const addNote = async (entryId: string, body: string) => {
+    if (!id || !body.trim()) return;
+    await apiFetch(`patients/${id}/notes`, { method: 'POST', body: JSON.stringify({ body, entryId }) });
     await load();
   };
 
@@ -214,28 +209,18 @@ export function PatientDetailPage() {
   const expected = week?.days.filter((d) => d.isExpected && !d.isFuture).length ?? 0;
   const filledWeek = week?.days.filter((d) => d.isFilled).length ?? 0;
   const dayEntries = entries.filter((e) => e.entryDate === selectedDate);
+  const notesFor = (entryId: string) => notes.filter((n) => n.entryId === entryId);
   const filteredHistory = filterEntriesByDate(entries, histFrom, histTo);
   const reports = useMemo(
     () => (fields ? buildFieldReports(filterEntriesByDate(entries, histFrom, histTo), fields) : []),
     [entries, fields, histFrom, histTo],
   );
-  const filteredNotes = notes.filter((n) => {
-    const day = n.createdAt.slice(0, 10);
-    return day >= histFrom && day <= histTo;
-  });
   const histPaged = usePagedSort(filteredHistory, {
     search: histSearch,
     match: (e, q) => `${e.entryDate} ${JSON.stringify(e.values)}`.toLowerCase().includes(q),
     sortKey: histSort,
     sortDir: histDir,
     value: (e, key) => (key === 'updated' ? e.updatedAt : e.entryDate),
-  });
-  const notesPaged = usePagedSort(filteredNotes, {
-    search: noteSearch,
-    match: (n, q) => n.body.toLowerCase().includes(q),
-    sortKey: noteSort,
-    sortDir: noteDir,
-    value: (n) => n.createdAt,
   });
 
   let daysWithout = 0;
@@ -256,6 +241,10 @@ export function PatientDetailPage() {
   const fullName = `${patient.firstName} ${patient.lastName}`;
   const base = `/pro/pacientes/${id}`;
   const section = seccion ?? '';
+
+  if (section === 'notas') {
+    return <Navigate to={`${base}/historial`} replace />;
+  }
 
   return (
     <ProLayout workspaceName={workspace?.workspace.name}>
@@ -372,6 +361,11 @@ export function PatientDetailPage() {
               dayEntries.map((entry) => (
                 <Card key={entry.id}>
                   <EntryReadout fields={fields} entry={entry} />
+                  <EntryNotes
+                    notes={notesFor(entry.id)}
+                    onAdd={(body) => addNote(entry.id, body)}
+                    onDelete={deleteNote}
+                  />
                 </Card>
               ))
             )}
@@ -421,7 +415,7 @@ export function PatientDetailPage() {
             }}
           />
           <h2 className="font-display mb-3 mt-6 text-xl">Historial</h2>
-          <p className="mb-3 text-sm text-[var(--ink-soft)]">Filtrado por fechas. Todo lo que escribió, sin recortar.</p>
+          <p className="mb-3 text-sm text-[var(--ink-soft)]">Filtrado por fechas. Todo lo que escribió, sin recortar. El comentario tuyo va en cada carga.</p>
           <ListToolbar search={histSearch} onSearch={setHistSearch} placeholder="Buscar en las cargas..." />
           <SortHeader
             columns={[
@@ -443,6 +437,11 @@ export function PatientDetailPage() {
               <Card key={entry.id} className="anim-in">
                 <p className="mb-2 text-sm font-medium">{formatDateAR(entry.entryDate)}</p>
                 <EntryReadout fields={fields} entry={entry} />
+                <EntryNotes
+                  notes={notesFor(entry.id)}
+                  onAdd={(body) => addNote(entry.id, body)}
+                  onDelete={deleteNote}
+                />
               </Card>
             ))}
             {histPaged.total === 0 ? (
@@ -453,56 +452,6 @@ export function PatientDetailPage() {
           </div>
           <Pagination page={histPaged.page} pageCount={histPaged.pageCount} total={histPaged.total} onPage={histPaged.setPage} />
         </>
-      ) : null}
-
-      {section === 'notas' ? (
-        <div className="space-y-4">
-          <DateRange
-            from={histFrom}
-            to={histTo}
-            onChange={(a, b) => {
-              const next = new URLSearchParams(searchParams);
-              next.set('desde', a);
-              next.set('hasta', b);
-              setSearchParams(next, { replace: true });
-            }}
-          />
-          <Card className="space-y-3">
-            <h2 className="font-display text-lg">Comentario del profesional</h2>
-            <p className="text-sm text-[var(--ink-soft)]">Queda en la ficha. El paciente no lo ve.</p>
-            <textarea
-              className="min-h-24 w-full rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-4 py-3"
-              value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
-              placeholder="Por ejemplo: en sesión hablamos de sueño y ansiedad."
-            />
-            <Button onClick={() => void addNote()} disabled={!noteBody.trim()}>
-              Guardar comentario
-            </Button>
-          </Card>
-          <ListToolbar search={noteSearch} onSearch={setNoteSearch} placeholder="Buscar en comentarios..." />
-          <SortHeader
-            columns={[{ key: 'date', label: 'Fecha' }]}
-            sortKey={noteSort}
-            sortDir={noteDir}
-            onSort={() => setNoteDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-          />
-          {notesPaged.pageItems.map((n) => (
-            <Card key={n.id} className="anim-in">
-              <p className="text-xs text-[var(--ink-soft)]">{new Date(n.createdAt).toLocaleString('es-AR')}</p>
-              <p className="mt-2 whitespace-pre-wrap">{n.body}</p>
-              <Button variant="ghost" className="mt-2" onClick={() => void deleteNote(n.id)}>
-                Borrar
-              </Button>
-            </Card>
-          ))}
-          {notesPaged.total === 0 ? (
-            <Card>
-              <p className="text-[var(--ink-soft)]">No hay comentarios en este rango.</p>
-            </Card>
-          ) : null}
-          <Pagination page={notesPaged.page} pageCount={notesPaged.pageCount} total={notesPaged.total} onPage={notesPaged.setPage} />
-        </div>
       ) : null}
 
       {section === 'equipo' && isAdmin ? (
@@ -544,7 +493,7 @@ export function PatientDetailPage() {
         </Card>
       ) : null}
 
-      {section && !['historial', 'notas', 'equipo'].includes(section) ? (
+      {section && !['historial', 'equipo'].includes(section) ? (
         <Card>
           <p>No encontramos esa sección.</p>
           <Button className="mt-3" variant="secondary" onClick={() => navigate(base)}>

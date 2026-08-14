@@ -119,6 +119,7 @@ export interface EntryDoc {
 export interface ProfessionalNoteDoc {
   workspaceId: string;
   workspacePatientId: string;
+  entryId?: string;
   authorUserId: string;
   body: string;
   createdAt: string;

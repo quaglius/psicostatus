@@ -1414,11 +1414,21 @@ export async function handleListNotes(auth: AuthContext, patientId: string, from
 
 export async function handleCreateNote(auth: AuthContext, patientId: string, event: HandlerEvent) {
   const patient = await assertCanEditPatient(auth.user, patientId);
-  const body = parseBody<{ body: string }>(event);
+  const body = parseBody<{ body: string; entryId: string }>(event);
   if (!body.body?.trim()) throw new ApiHttpError(400, 'INVALID_INPUT', 'Escribí un comentario');
+  if (!body.entryId) throw new ApiHttpError(400, 'INVALID_INPUT', 'El comentario va en una carga del historial');
+
+  const entryDoc = await getDb().collection(COLLECTIONS.entries).doc(body.entryId).get();
+  if (!entryDoc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'No encontramos esa carga');
+  const entry = entryDoc.data() as EntryDoc;
+  if (entry.workspacePatientId !== patientId) {
+    throw new ApiHttpError(403, 'FORBIDDEN', 'Esa carga no es de esta persona');
+  }
+
   const note: ProfessionalNoteDoc = {
     workspaceId: patient.workspaceId,
     workspacePatientId: patientId,
+    entryId: body.entryId,
     authorUserId: auth.userId,
     body: body.body.trim(),
     createdAt: nowISO(),
