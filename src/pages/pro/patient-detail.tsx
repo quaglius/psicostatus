@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { apiFetch, ApiClientError } from '@/lib/api';
@@ -16,11 +16,11 @@ import { ImagePicker } from '@/components/image-picker';
 import { DateRange } from '@/components/date-range';
 import { FieldReports } from '@/components/field-reports';
 import { PageSkeleton } from '@/components/skeleton';
-import { APP_NAME, MEMBER_ROLE, PERIODICITY, adherenceCopy } from '@/lib/labels';
+import { MEMBER_ROLE, PERIODICITY, adherenceCopy } from '@/lib/labels';
 import { ListToolbar, Pagination, SortHeader, usePagedSort, type SortDir } from '@/components/paged-list';
 import { addDays, formatDateAR, formatDateISO, parseISODate, todayInAR } from '@shared/periodicity';
 import { buildFieldReports, filterEntriesByDate } from '@shared/report';
-import { downloadNodeAsPdf } from '@/lib/pdf';
+import { downloadPatientStatusPdf } from '@/lib/pdf';
 import type {
   EntryDoc,
   FieldDefinition,
@@ -78,7 +78,6 @@ export function PatientDetailPage() {
   const [assigning, setAssigning] = useState(false);
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const reportRef = useRef<HTMLDivElement>(null);
 
   const weekFrom = searchParams.get('semana') ?? '';
   const selectedDate = searchParams.get('dia') || todayInAR();
@@ -332,11 +331,16 @@ export function PatientDetailPage() {
                 variant="secondary"
                 disabled={pdfBusy || reports.length === 0}
                 onClick={() => {
-                  const node = reportRef.current;
-                  if (!node || !patient) return;
+                  if (!patient) return;
                   setPdfBusy(true);
                   const slug = `${patient.firstName}-${patient.lastName}`.replace(/\s+/g, '-').toLowerCase();
-                  void downloadNodeAsPdf(node, `shanti-${slug}-${histFrom}-${histTo}.pdf`)
+                  void downloadPatientStatusPdf({
+                    filename: `shanti-${slug}-${histFrom}-${histTo}.pdf`,
+                    patientName: `${patient.firstName} ${patient.lastName}`,
+                    periodLabel: `${formatDateAR(histFrom)} — ${formatDateAR(histTo)}`,
+                    templateName,
+                    reports,
+                  })
                     .catch(() =>
                       setNotice({
                         title: 'No se pudo armar el PDF',
@@ -356,15 +360,7 @@ export function PatientDetailPage() {
               setSearchParams(next, { replace: true });
             }} />
           </Card>
-          <div ref={reportRef} className="mb-8 space-y-4 rounded-[var(--radius-card)] bg-[var(--paper)] p-1">
-            <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-              <p className="text-xs tracking-[0.12em] text-[var(--sage)] uppercase">{APP_NAME}</p>
-              <p className="font-display text-xl">{fullName}</p>
-              <p className="text-sm text-[var(--ink-soft)]">
-                {formatDateAR(histFrom)} — {formatDateAR(histTo)}
-                {templateName ? ` · ${templateName}` : ''}
-              </p>
-            </div>
+          <div className="mb-8 space-y-4">
             <FieldReports reports={reports} />
           </div>
 
