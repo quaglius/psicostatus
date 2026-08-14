@@ -11,6 +11,7 @@ import { ScreenSkeleton } from '@/components/skeleton';
 import { TeamPage } from '@/pages/pro/team';
 import { WorkspacePage } from '@/pages/pro/workspace';
 import { InvitePage } from '@/pages/patient/invite';
+import { PatientAccessPage } from '@/pages/patient/access';
 import { PatientTodayPage } from '@/pages/patient/today';
 import { PatientWeekPage } from '@/pages/patient/week';
 import { PatientAccountPage } from '@/pages/patient/account';
@@ -64,6 +65,7 @@ export function App() {
       <Route path="/registro/profesional" element={<GuestOnly><RegisterProfessionalPage /></GuestOnly>} />
       <Route path="/privacidad" element={<PrivacyPage />} />
       <Route path="/terminos" element={<TermsPage />} />
+      <Route path="/paciente" element={<PatientAccessPage />} />
       <Route path="/i/:token" element={<InvitePage />} />
 
       {import.meta.env.DEV ? <Route path="/dev/ui" element={<DevUiPage />} /> : null}

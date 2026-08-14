@@ -91,11 +91,12 @@ export function InvitePage() {
       <AuthForm
         mode="login"
         allowSwitch
+        allowGoogle
         title={`Te invita ${invite.workspaceName}`}
         subtitle={
           invite.kind === 'staff'
             ? `${MEMBER_ROLE[(invite.role as WorkspaceMemberRole) || 'professional'].label}. Si ya tenés cuenta, ingresá. Si es la primera vez, creá una.`
-            : 'Si ya tenés cuenta, ingresá y te llevamos. Si es la primera vez, creá una y empezá a cargar.'
+            : 'Este es el único lugar donde podés crear tu cuenta como paciente. Si ya tenés cuenta, ingresá y seguimos.'
         }
         redirectTo={`/i/${token}`}
       />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   createUserWithEmailAndPassword,
@@ -17,9 +17,11 @@ import { Card } from '@/components/ui/Card';
 export interface AuthFormProps {
   mode: 'login' | 'register';
   allowSwitch?: boolean;
+  allowGoogle?: boolean;
   redirectTo?: string;
   title?: string;
   subtitle?: string;
+  footerNote?: ReactNode;
 }
 
 function authErrorMessage(
@@ -37,10 +39,12 @@ function authErrorMessage(
     'auth/invalid-credential':
       ctx.allowSwitch && ctx.mode === 'login'
         ? 'Correo o contraseña incorrectos. Si es tu primera vez, tocá «Crear cuenta».'
-        : 'Correo o contraseña incorrectos.',
+        : ctx.mode === 'login'
+          ? 'Correo o contraseña incorrectos. Si sos paciente nuevo, entrá con el link que te mandó tu profesional.'
+          : 'Correo o contraseña incorrectos.',
     'auth/user-not-found': ctx.allowSwitch
       ? 'No hay una cuenta con ese correo. Tocá «Crear cuenta».'
-      : 'No hay una cuenta con ese correo.',
+      : 'No hay una cuenta con ese correo. Si sos paciente, pedile a tu profesional que te invite con un link.',
     'auth/wrong-password': 'Correo o contraseña incorrectos.',
     'auth/popup-closed-by-user': 'Cerraste la ventana de Google. Probá de nuevo.',
     'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permití popups.',
@@ -59,9 +63,11 @@ function authErrorMessage(
 export function AuthForm({
   mode: initialMode,
   allowSwitch = false,
+  allowGoogle = true,
   redirectTo = '/app',
   title,
   subtitle,
+  footerNote,
 }: AuthFormProps) {
   const navigate = useNavigate();
   const { refreshMe } = useAuth();
@@ -215,15 +221,19 @@ export function AuthForm({
           </Button>
         </form>
 
-        <Button variant="secondary" fullWidth onClick={handleGoogle} disabled={loading}>
-          Continuar con Google
-        </Button>
+        {allowGoogle ? (
+          <Button variant="secondary" fullWidth onClick={handleGoogle} disabled={loading}>
+            Continuar con Google
+          </Button>
+        ) : null}
 
         {mode === 'login' ? (
           <button type="button" className="text-sm text-[var(--sage)]" onClick={handleReset}>
             No me acuerdo la contraseña
           </button>
         ) : null}
+
+        {footerNote ? <p className="text-center text-sm text-[var(--ink-soft)]">{footerNote}</p> : null}
 
         <p className="text-center text-sm text-[var(--ink-soft)]">
           <Link to="/">Volver al inicio</Link>
@@ -237,10 +247,23 @@ export function LoginPage() {
   return (
     <AuthForm
       mode="login"
-      allowSwitch
+      allowGoogle={false}
       redirectTo="/app"
       title="Ingresar"
-      subtitle="Pacientes y profesionales. Si ya estás en este dispositivo, te llevamos adentro y no te pedimos la clave de nuevo."
+      subtitle="Si ya tenés cuenta (por invitación de tu profesional o como consultorio), ingresá acá. Los pacientes nuevos entran solo con el link que les mandan."
+      footerNote={
+        <>
+          ¿Sos profesional y no tenés cuenta?{' '}
+          <Link to="/registro/profesional" className="text-[var(--sage)]">
+            Crear espacio profesional
+          </Link>
+          . ¿Sos paciente sin link?{' '}
+          <Link to="/paciente" className="text-[var(--sage)]">
+            Pedile la invitación a tu profesional
+          </Link>
+          .
+        </>
+      }
     />
   );
 }

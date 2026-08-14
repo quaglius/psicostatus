@@ -25,7 +25,7 @@ function HeaderCta() {
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link to="/ingresar">
+      <Link to="/paciente">
         <Button variant="secondary">Soy paciente</Button>
       </Link>
       <Link to="/registro/profesional" className="hidden sm:inline">
@@ -67,10 +67,11 @@ function HeroCta() {
       <div className="rounded-[var(--radius-card)] border border-[var(--sage)] bg-[var(--sage-soft)] px-4 py-3">
         <p className="font-medium">¿Sos paciente?</p>
         <p className="text-sm text-[var(--ink-soft)]">
-          Si tu profesional te pasó un link, abrilo. Si ya te registraste, tocá ingresar: te reconocemos y no te pedimos la clave de nuevo.
+          Pedile a tu profesional que te invite con un link. Ahí creás la cuenta o ingresás si ya la tenés. No podés
+          registrarte por tu cuenta desde acá.
         </p>
-        <Link to="/ingresar" className="mt-2 inline-block">
-          <Button variant="secondary">Ingresar como paciente</Button>
+        <Link to="/paciente" className="mt-2 inline-block">
+          <Button variant="secondary">Cómo entro como paciente</Button>
         </Link>
       </div>
     </div>
@@ -152,8 +153,8 @@ export function LandingPage() {
             después de una noche difícil, o a la mañana con el café.
           </p>
           <div className="mt-5">
-            <Link to="/ingresar">
-              <Button variant="secondary">Ingresar como paciente</Button>
+            <Link to="/paciente">
+              <Button variant="secondary">Cómo entro como paciente</Button>
             </Link>
           </div>
         </div>
@@ -256,8 +257,8 @@ export function LandingPage() {
           <div>
             <dt className="font-display text-xl">¿Cómo entra el paciente?</dt>
             <dd className="mt-2 text-[var(--ink-soft)]">
-              Compartís un link. Si es la primera vez, crea cuenta. Si ya tiene, entra con la misma y no le pedimos la
-              clave de nuevo si ya está en el teléfono.
+              Solo con el link que le manda su profesional. Ahí crea la cuenta o ingresa si ya la tiene. Si no tiene link,
+              tiene que pedirle la invitación.
             </dd>
           </div>
         </dl>
@@ -279,7 +280,7 @@ export function LandingPage() {
           <div className="flex flex-wrap gap-5 text-sm text-[var(--ink-soft)]">
             <Link to="/privacidad">Privacidad</Link>
             <Link to="/terminos">Términos</Link>
-            <Link to="/ingresar">Soy paciente</Link>
+            <Link to="/paciente">Soy paciente</Link>
             <Link to="/registro/profesional">Soy profesional</Link>
           </div>
         </div>
