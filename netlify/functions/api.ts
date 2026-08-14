@@ -100,6 +100,8 @@ async function route(event: HandlerEvent) {
       workspaceId,
       event.queryStringParameters?.from,
       event.queryStringParameters?.to,
+      event.queryStringParameters?.paciente,
+      event.queryStringParameters?.plantilla,
     );
   }
 
@@ -154,7 +156,7 @@ async function route(event: HandlerEvent) {
   if (method === 'GET' && path.match(/^templates\/[^/]+$/)) {
     return handleGetTemplate(auth, path.replace('templates/', ''));
   }
-  if (method === 'PATCH' && path.match(/^templates\/[^/]+$/)) {
+  if ((method === 'PATCH' || method === 'POST') && path.match(/^templates\/[^/]+$/)) {
     return handlePatchTemplate(auth, path.replace('templates/', ''), event);
   }
   if (method === 'POST' && path.match(/^templates\/[^/]+\/default$/)) {

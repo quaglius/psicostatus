@@ -26,9 +26,19 @@ export const fieldDefinitionSchema = z.object({
 export const fieldsArraySchema = z.array(fieldDefinitionSchema).min(1);
 
 export function validateFieldDefinitions(fields: FieldDefinition[]): FieldDefinition[] {
-  const parsed = fieldsArraySchema.parse(fields);
+  const parsed = fieldsArraySchema.safeParse(fields);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    if (issue?.path.includes('label')) {
+      throw new Error('Hay una pregunta sin título. Completala o borrala.');
+    }
+    if (issue?.path.includes('type')) {
+      throw new Error('Hay un tipo de pregunta que no reconocemos. Guardá de nuevo o sacala.');
+    }
+    throw new Error('Revisá las preguntas: falta algún dato para guardar.');
+  }
   const ids = new Set<string>();
-  for (const field of parsed) {
+  for (const field of parsed.data) {
     if (ids.has(field.id)) {
       throw new Error(`Campo duplicado: ${field.id}`);
     }
@@ -53,7 +63,7 @@ export function validateFieldDefinitions(fields: FieldDefinition[]): FieldDefini
       }
     }
   }
-  return parsed.sort((a, b) => a.order - b.order);
+  return parsed.data.sort((a, b) => a.order - b.order);
 }
 
 export function validateEntryValues(

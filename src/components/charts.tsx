@@ -25,6 +25,35 @@ export function BarChart({ title, help, points }: { title: string; help: string;
   );
 }
 
+export function HorizontalBarChart({ title, help, points }: { title: string; help: string; points: BarPoint[] }) {
+  const max = Math.max(1, ...points.map((p) => p.value));
+  const total = points.reduce((s, p) => s + p.value, 0) || 1;
+  return (
+    <div>
+      <p className="font-display text-lg">{title}</p>
+      <p className="mb-4 text-sm text-[var(--ink-soft)]">{help}</p>
+      <div className="space-y-2">
+        {points.map((p) => (
+          <div key={p.label}>
+            <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+              <span className="truncate">{p.label}</span>
+              <span className="shrink-0 text-[var(--ink-soft)]">
+                {p.value} · {Math.round((p.value / total) * 100)}%
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[var(--empty)]">
+              <div
+                className="h-full rounded-full bg-[var(--sage)]"
+                style={{ width: `${Math.round((p.value / max) * 100)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Sparkline({ title, help, values }: { title: string; help: string; values: number[] }) {
   if (values.length < 2) return null;
   const min = Math.min(...values);
@@ -80,7 +109,7 @@ export function LineChart({
         {values.map((v, i) => {
           const x = (i / (values.length - 1)) * w;
           const y = h - ((v - min) / span) * (h - 8) - 4;
-          return <circle key={points[i]!.label + i} cx={x} cy={y} r="3.5" fill="var(--sage)" />;
+          return <circle key={`${points[i]!.label}-${i}`} cx={x} cy={y} r="3.5" fill="var(--sage)" />;
         })}
       </svg>
       <div className="mt-1 flex justify-between text-[11px] text-[var(--ink-soft)]">

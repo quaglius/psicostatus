@@ -90,6 +90,7 @@ export function LandingPage() {
         </div>
       </header>
 
+      <main>
       <section className="mx-auto grid max-w-[1080px] items-center gap-10 px-5 py-12 md:grid-cols-2 md:py-16">
         <div>
           <p className="mb-3 text-sm tracking-[0.14em] text-[var(--clay)] uppercase">Para psicólogos y psiquiatras</p>
@@ -235,6 +236,33 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      <section className="mx-auto max-w-[1080px] px-5 pb-20" aria-labelledby="faq-title">
+        <h2 id="faq-title" className="font-display mb-8 text-3xl">Preguntas frecuentes</h2>
+        <dl className="grid gap-6 md:grid-cols-3">
+          <div>
+            <dt className="font-display text-xl">¿Qué es Shanti?</dt>
+            <dd className="mt-2 text-[var(--ink-soft)]">
+              Una herramienta web de seguimiento diario para psicólogos y psiquiatras. El paciente anota cómo está; vos
+              lo ves en el tablero antes de la sesión.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-display text-xl">¿Reemplaza la historia clínica?</dt>
+            <dd className="mt-2 text-[var(--ink-soft)]">
+              No. No es historia clínica ni diagnóstico. El profesional es responsable del uso clínico.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-display text-xl">¿Cómo entra el paciente?</dt>
+            <dd className="mt-2 text-[var(--ink-soft)]">
+              Compartís un link. Si es la primera vez, crea cuenta. Si ya tiene, entra con la misma y no le pedimos la
+              clave de nuevo si ya está en el teléfono.
+            </dd>
+          </div>
+        </dl>
+      </section>
+      </main>
 
       <footer className="border-t border-[var(--line)] px-5 py-10">
         <div className="mx-auto flex max-w-[1080px] flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">

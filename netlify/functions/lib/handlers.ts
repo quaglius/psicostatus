@@ -15,7 +15,7 @@ import type {
   WorkspaceMemberDoc,
   WorkspacePatientDoc,
 } from '../../../shared/types';
-import { buildFieldReports, dailyCounts, mergeFieldReports, weekdayCounts } from '../../../shared/report';
+import { buildFieldReports, dailyCounts, formatReportValue, mergeFieldReports, weekdayCounts } from '../../../shared/report';
 import {
   computeAdherence,
   computePeriodKey,
@@ -39,11 +39,20 @@ import {
   getWorkspaceMember,
   listVisiblePatients,
 } from './access';
-import { COLLECTIONS, getAdminAuth, getBucket, getDb } from './firebase';
+import { COLLECTIONS, getAdminAuth, getDb, saveStorageObject } from './firebase';
 import { ApiHttpError, type AuthContext, jsonResponse, parseBody, verifyBearer } from './http';
 
 function yesterdayInAR(): string {
   return formatDateISO(addDays(parseISODate(todayInAR()), -1));
+}
+
+function parsedTemplateFields(fields: TemplateVersionDoc['fields']) {
+  try {
+    return validateFieldDefinitions(fields);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Revisá las preguntas de la plantilla';
+    throw new ApiHttpError(400, 'INVALID_FIELDS', message);
+  }
 }
 
 async function latestTemplateVersionId(db: ReturnType<typeof getDb>, templateId: string): Promise<string> {
@@ -722,7 +731,7 @@ export async function handleCreateTemplate(auth: AuthContext, event: HandlerEven
     version: 1,
     periodicityType: 'daily',
     periodicityConfig: {},
-    fields: validateFieldDefinitions(body.fields ?? DEFAULT_TEMPLATE_FIELDS),
+    fields: parsedTemplateFields(body.fields ?? DEFAULT_TEMPLATE_FIELDS),
     patientGuide: body.patientGuide?.trim() || null,
     createdAt: nowISO(),
   };
@@ -751,7 +760,7 @@ export async function handleCreateTemplateVersion(auth: AuthContext, templateId:
     mutateIfNoEntries?: boolean;
   }>(event);
 
-  const fields = validateFieldDefinitions(body.fields);
+  const fields = parsedTemplateFields(body.fields);
   const latestSnap = await db
     .collection(COLLECTIONS.templateVersions)
     .where('templateId', '==', templateId)
@@ -782,6 +791,8 @@ export async function handleCreateTemplateVersion(auth: AuthContext, templateId:
         id: latestDoc.id,
         ...latest,
         fields,
+        periodicityType: body.periodicityType ?? latest.periodicityType,
+        periodicityConfig: body.periodicityConfig ?? latest.periodicityConfig,
         patientGuide: body.patientGuide !== undefined ? body.patientGuide?.trim() || null : latest.patientGuide ?? null,
       },
     });
@@ -798,8 +809,17 @@ export async function handleCreateTemplateVersion(auth: AuthContext, templateId:
     createdAt: nowISO(),
   };
 
-  await db.collection(COLLECTIONS.templateVersions).doc(versionId).set(version);
-  return jsonResponse(201, { version: { id: versionId, ...version } });
+  const assignSnap = await db.collection(COLLECTIONS.assignments).where('templateId', '==', templateId).get();
+  const openAssignments = assignSnap.docs.filter((d) => (d.data() as AssignmentDoc).endsAt == null);
+
+  const writeBatch = db.batch();
+  writeBatch.set(db.collection(COLLECTIONS.templateVersions).doc(versionId), version);
+  for (const d of openAssignments) {
+    writeBatch.update(d.ref, { templateVersionId: versionId });
+  }
+  await writeBatch.commit();
+
+  return jsonResponse(201, { version: { id: versionId, ...version }, assignedCount: openAssignments.length });
 }
 
 export async function handleGetWeek(auth: AuthContext, patientId: string, from?: string) {
@@ -1061,7 +1081,14 @@ export async function handleDisableUser(auth: AuthContext, userId: string) {
   return jsonResponse(200, { ok: true });
 }
 
-export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: string, fromParam?: string, toParam?: string) {
+export async function handleWorkspaceOverview(
+  auth: AuthContext,
+  workspaceId: string,
+  fromParam?: string,
+  toParam?: string,
+  patientId?: string,
+  templateId?: string,
+) {
   await assertWorkspaceStaff(auth.user, workspaceId);
   const patients = await listVisiblePatients(auth.user, workspaceId);
   const db = getDb();
@@ -1070,27 +1097,67 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
   const from = fromParam || formatDateISO(addDays(parseISODate(to), -27));
   const weekStart = formatDateISO(startOfWeekMonday(parseISODate(todayInAR())));
 
+  const templatesSnap = await db.collection(COLLECTIONS.templates).where('workspaceId', '==', workspaceId).get();
+  const templates = templatesSnap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as TemplateDoc) }))
+    .filter((t) => !t.archivedAt)
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+  const chosenTemplate =
+    (templateId ? templates.find((t) => t.id === templateId) : undefined) ??
+    templates.find((t) => t.isDefault) ??
+    templates[0] ??
+    null;
+
+  let versionIds: Set<string> | null = null;
+  let reportFields: TemplateVersionDoc['fields'] = [];
+  if (chosenTemplate) {
+    const versionsSnap = await db
+      .collection(COLLECTIONS.templateVersions)
+      .where('templateId', '==', chosenTemplate.id)
+      .get();
+    versionIds = new Set(versionsSnap.docs.map((d) => d.id));
+    const latest = versionsSnap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as TemplateVersionDoc) }))
+      .sort((a, b) => b.version - a.version)[0];
+    reportFields = latest?.fields ?? [];
+  }
+
+  const scopedPatients =
+    patientId && patients.some((p) => p.id === patientId) ? patients.filter((p) => p.id === patientId) : patients;
+
   let entriesThisWeek = 0;
   let totalAdherence = { expected: 0, filled: 0 };
   const rangeEntries: EntryDoc[] = [];
   const reports: ReturnType<typeof buildFieldReports> = [];
+  const exportRows: Array<{ entryDate: string; patientName: string; values: Record<string, string> }> = [];
 
-  for (const p of patients) {
+  for (const p of scopedPatients) {
     const entriesSnap = await db
       .collection(COLLECTIONS.entries)
       .where('workspacePatientId', '==', p.id)
       .where('entryDate', '>=', from)
       .where('entryDate', '<=', to)
       .get();
-    const patientEntries = entriesSnap.docs.map((d) => d.data() as EntryDoc);
+    const inRange = entriesSnap.docs.map((d) => d.data() as EntryDoc);
+    const patientEntries = versionIds ? inRange.filter((e) => versionIds!.has(e.templateVersionId)) : inRange;
     rangeEntries.push(...patientEntries);
+    const patientName = `${p.firstName} ${p.lastName}`.trim();
+    for (const e of [...patientEntries].sort((a, b) => a.entryDate.localeCompare(b.entryDate))) {
+      const values: Record<string, string> = {};
+      for (const field of reportFields) {
+        values[field.id] = formatReportValue(field, e.values[field.id]);
+      }
+      exportRows.push({ entryDate: e.entryDate, patientName, values });
+    }
 
     const weekSnap = await db
       .collection(COLLECTIONS.entries)
       .where('workspacePatientId', '==', p.id)
       .where('entryDate', '>=', weekStart)
       .get();
-    entriesThisWeek += weekSnap.size;
+    const weekEntries = weekSnap.docs.map((d) => d.data() as EntryDoc);
+    entriesThisWeek += versionIds ? weekEntries.filter((e) => versionIds!.has(e.templateVersionId)).length : weekSnap.size;
 
     const assignmentSnap = await db
       .collection(COLLECTIONS.assignments)
@@ -1103,12 +1170,22 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
       const assignment = assignmentSnap.docs[0]!.data() as AssignmentDoc;
       const versionDoc = await db.collection(COLLECTIONS.templateVersions).doc(assignment.templateVersionId).get();
       const version = versionDoc.data() as TemplateVersionDoc;
-      if (version?.fields) reports.push(...buildFieldReports(patientEntries, version.fields));
       const allEntries = await db.collection(COLLECTIONS.entries).where('workspacePatientId', '==', p.id).get();
       const filledDates = new Set(allEntries.docs.map((e) => (e.data() as EntryDoc).entryDate));
-      const adh = computeAdherence(version.periodicityType, version.periodicityConfig, assignment.startsAt, filledDates);
-      totalAdherence.expected += adh.expected;
-      totalAdherence.filled += adh.filled;
+      if (version) {
+        const adh = computeAdherence(version.periodicityType, version.periodicityConfig, assignment.startsAt, filledDates);
+        totalAdherence.expected += adh.expected;
+        totalAdherence.filled += adh.filled;
+      }
+    }
+
+    if (reportFields.length) {
+      reports.push(...buildFieldReports(patientEntries, reportFields));
+    } else if (!assignmentSnap.empty) {
+      const assignment = assignmentSnap.docs[0]!.data() as AssignmentDoc;
+      const versionDoc = await db.collection(COLLECTIONS.templateVersions).doc(assignment.templateVersionId).get();
+      const version = versionDoc.data() as TemplateVersionDoc;
+      if (version?.fields) reports.push(...buildFieldReports(patientEntries, version.fields));
     }
   }
 
@@ -1120,7 +1197,7 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
     photoUrl?: string | null;
   }> = [];
 
-  for (const p of patients) {
+  for (const p of scopedPatients) {
     const entriesSnap = await db
       .collection(COLLECTIONS.entries)
       .where('workspacePatientId', '==', p.id)
@@ -1165,7 +1242,7 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
   return jsonResponse(200, {
     from,
     to,
-    activePatients: patients.length,
+    activePatients: scopedPatients.length,
     entriesThisWeek,
     entriesInRange: rangeEntries.length,
     adherencePercent:
@@ -1174,6 +1251,12 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
     weekdayLoads: weekdayCounts(rangeEntries),
     dailyLoads: dailyCounts(rangeEntries),
     fieldReports: mergeFieldReports(reports),
+    patients: patients.map((p) => ({ id: p.id, firstName: p.firstName, lastName: p.lastName })),
+    templates: templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault })),
+    templateId: chosenTemplate?.id ?? null,
+    templateName: chosenTemplate?.name ?? null,
+    exportFields: reportFields.map((f) => ({ id: f.id, label: f.label, type: f.type })),
+    exportRows,
   });
 }
 
@@ -1492,15 +1575,8 @@ export async function handleUpload(auth: AuthContext, event: HandlerEvent) {
   const token = uuidv4();
   const path = `shanti/${body.purpose}/${body.targetId}/${token}.webp`;
   try {
-    const file = getBucket().file(path);
-    await file.save(buffer, {
-      resumable: false,
-      metadata: {
-        contentType,
-        metadata: { firebaseStorageDownloadTokens: token },
-      },
-    });
-    const url = `https://firebasestorage.googleapis.com/v0/b/${getBucket().name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+    const { bucketName } = await saveStorageObject(path, buffer, contentType, token);
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
     if (body.purpose === 'workspace') {
       await getDb().collection(COLLECTIONS.workspaces).doc(body.targetId).update({ imageUrl: url });
     } else {
@@ -1508,7 +1584,24 @@ export async function handleUpload(auth: AuthContext, event: HandlerEvent) {
     }
     return jsonResponse(200, { url });
   } catch (err) {
+    if (err instanceof ApiHttpError) throw err;
     console.error(err);
-    throw new ApiHttpError(500, 'UPLOAD_FAILED', 'No pudimos guardar la imagen. Si es la primera vez, hay que activar Storage en Firebase.');
+    const extra = err as { code?: unknown; message?: unknown };
+    const raw = `${extra?.code ?? ''} ${extra?.message ?? (err instanceof Error ? err.message : '')}`;
+    if (/404|not found|does not exist/i.test(raw)) {
+      throw new ApiHttpError(
+        500,
+        'UPLOAD_FAILED',
+        'Falta crear Storage en Firebase: Consola → Compilación → Storage → Comenzar. Tiene que ser el mismo proyecto (psicostatus).',
+      );
+    }
+    if (/403|forbidden|permission|access/i.test(raw)) {
+      throw new ApiHttpError(
+        500,
+        'UPLOAD_FAILED',
+        'No hay permiso para subir archivos. Revisá que la cuenta de servicio tenga acceso a Storage.',
+      );
+    }
+    throw new ApiHttpError(500, 'UPLOAD_FAILED', 'No pudimos guardar la imagen. Probá con otra más liviana o más tarde.');
   }
 }

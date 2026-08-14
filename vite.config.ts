@@ -10,11 +10,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'og.png'],
       manifest: {
         name: 'Shanti',
         short_name: 'Shanti',
-        description: 'Seguimiento de ánimo, medicación y notas para psicólogos y psiquiatras',
+        description: 'Seguimiento diario para psicólogos y psiquiatras: ánimo, medicación y notas entre sesiones.',
         theme_color: '#F4EFE6',
         background_color: '#F4EFE6',
         display: 'standalone',

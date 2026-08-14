@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /pro/
+Disallow: /paciente/
+Disallow: /admin/
+Disallow: /app
+Disallow: /i/
+
+Sitemap: https://psicostatus.netlify.app/sitemap.xml

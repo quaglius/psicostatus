@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ClipboardList, LayoutGrid, Users } from 'lucide-react';
+import { ClipboardList, Download, LayoutGrid, Users } from 'lucide-react';
 import { apiFetch, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
@@ -13,6 +13,7 @@ import { AdherenceRing, BarChart, LineChart } from '@/components/charts';
 import { DateRange } from '@/components/date-range';
 import { FieldReports } from '@/components/field-reports';
 import { PageSkeleton } from '@/components/skeleton';
+import { downloadCsv } from '@/lib/csv';
 import { WORKSPACE_KIND } from '@/lib/labels';
 import { GuidedTour, TourReplay } from '@/components/guided-tour';
 import { PRO_TOUR_STEPS, TOUR_PRO } from '@/lib/tours';
@@ -39,6 +40,12 @@ interface Overview {
   weekdayLoads: Array<{ label: string; value: number }>;
   dailyLoads: Array<{ label: string; value: number }>;
   fieldReports: FieldReport[];
+  patients: Array<{ id: string; firstName: string; lastName: string }>;
+  templates: Array<{ id: string; name: string; isDefault: boolean }>;
+  templateId: string | null;
+  templateName: string | null;
+  exportFields: Array<{ id: string; label: string; type: string }>;
+  exportRows: Array<{ entryDate: string; patientName: string; values: Record<string, string> }>;
 }
 
 export function WorkspacePage() {
@@ -48,6 +55,8 @@ export function WorkspacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const from = searchParams.get('desde') || formatDateISO(addDays(new Date(), -27));
   const to = searchParams.get('hasta') || todayInAR();
+  const patientFilter = searchParams.get('paciente') || '';
+  const templateFilter = searchParams.get('plantilla') || '';
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [name, setName] = useState(workspace?.name ?? '');
@@ -63,11 +72,33 @@ export function WorkspacePage() {
   useEffect(() => {
     if (!workspace) return;
     setLoadingOverview(true);
-    apiFetch<Overview>(`workspaces/${workspace.id}/overview?from=${from}&to=${to}`)
+    const q = new URLSearchParams({ from, to });
+    if (patientFilter) q.set('paciente', patientFilter);
+    if (templateFilter) q.set('plantilla', templateFilter);
+    apiFetch<Overview>(`workspaces/${workspace.id}/overview?${q.toString()}`)
       .then(setOverview)
       .catch(console.error)
       .finally(() => setLoadingOverview(false));
-  }, [workspace?.id, from, to]);
+  }, [workspace?.id, from, to, patientFilter, templateFilter]);
+
+  const setFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setSearchParams(next, { replace: true });
+  };
+
+  const exportCsv = () => {
+    if (!overview?.exportRows.length) return;
+    const headers = ['Fecha', 'Paciente', ...overview.exportFields.map((f) => f.label)];
+    const rows = overview.exportRows.map((row) => [
+      row.entryDate,
+      row.patientName,
+      ...overview.exportFields.map((f) => row.values[f.id] ?? ''),
+    ]);
+    const who = patientFilter ? overview.exportRows[0]?.patientName.replace(/\s+/g, '-').toLowerCase() : 'consultorio';
+    downloadCsv(`shanti-${who}-${overview.from}-${overview.to}.csv`, headers, rows);
+  };
 
   const save = async () => {
     if (!workspace) return;
@@ -144,8 +175,23 @@ export function WorkspacePage() {
         </Card>
       ) : null}
 
-      <Card className="mb-6">
-        <p className="mb-3 font-display text-lg">Reportería</p>
+      <Card className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-display text-lg">Reportería</p>
+            <p className="text-sm text-[var(--ink-soft)]">
+              Filtrá por persona y por cuestionario. Los gráficos siguen las preguntas de esa plantilla.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!overview?.exportRows.length}
+            onClick={exportCsv}
+          >
+            <Download size={16} /> Descargar CSV
+          </Button>
+        </div>
         <DateRange
           from={from}
           to={to}
@@ -156,6 +202,38 @@ export function WorkspacePage() {
             setSearchParams(next, { replace: true });
           }}
         />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1.5">
+            <span className="text-sm text-[var(--ink-soft)]">Persona</span>
+            <select
+              className="w-full rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              value={patientFilter}
+              onChange={(e) => setFilter('paciente', e.target.value)}
+            >
+              <option value="">Todas las personas activas</option>
+              {(overview?.patients ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.firstName} {p.lastName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm text-[var(--ink-soft)]">Plantilla</span>
+            <select
+              className="w-full rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
+              value={templateFilter || overview?.templateId || ''}
+              onChange={(e) => setFilter('plantilla', e.target.value)}
+            >
+              {(overview?.templates ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.isDefault ? ' (por defecto)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </Card>
 
       {loadingOverview || !overview ? (
@@ -203,7 +281,12 @@ export function WorkspacePage() {
             </Card>
           </div>
 
-          <h2 className="font-display mb-3 text-xl">Puntuaciones y caritas</h2>
+          <h2 className="font-display mb-1 text-xl">
+            {overview.templateName ? `Preguntas de «${overview.templateName}»` : 'Preguntas de la plantilla'}
+          </h2>
+          <p className="mb-3 text-sm text-[var(--ink-soft)]">
+            Lista, sí/no, caritas, escalas y números. El texto libre no se grafica: está en la ficha de cada persona.
+          </p>
           <div className="mb-8">
             <FieldReports reports={overview.fieldReports ?? []} />
           </div>

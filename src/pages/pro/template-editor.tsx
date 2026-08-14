@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Sheet } from '@/components/ui/Sheet';
 import { PageSkeleton } from '@/components/skeleton';
 import { FieldTypeIcon, PeriodicityIcon } from '@/lib/field-icons';
 import { FIELD_TYPE, PERIODICITY } from '@/lib/labels';
@@ -34,6 +35,7 @@ export function TemplateEditorPage() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [savedOpen, setSavedOpen] = useState(false);
   const [fields, setFields] = useState<FieldDefinition[]>(DEFAULT_TEMPLATE_FIELDS);
   const [periodicityType, setPeriodicityType] = useState<PeriodicityType>('daily');
   const [everyNDays, setEveryNDays] = useState(3);
@@ -101,7 +103,14 @@ export function TemplateEditorPage() {
   };
 
   const save = async () => {
-    if (!workspace || !name.trim()) return;
+    if (!name.trim()) {
+      setError('Poné un nombre a la plantilla.');
+      return;
+    }
+    if (!workspace) {
+      setError('No encontramos el espacio. Recargá la página.');
+      return;
+    }
     setSaving(true);
     setError('');
     const periodicityConfig =
@@ -119,14 +128,15 @@ export function TemplateEditorPage() {
         });
         navigate(`/pro/plantillas/${created.template.id}`, { replace: true });
       } else if (id) {
-        await apiFetch(`templates/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+        await apiFetch(`templates/${id}`, { method: 'POST', body: JSON.stringify({ name }) });
         await apiFetch(`templates/${id}/versions`, {
           method: 'POST',
           body: JSON.stringify(payload),
         });
+        setSavedOpen(true);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar');
+      setError(err instanceof ApiClientError ? err.message : err instanceof Error ? err.message : 'No se pudo guardar');
     } finally {
       setSaving(false);
     }
@@ -297,10 +307,16 @@ export function TemplateEditorPage() {
           </div>
         </div>
 
-        <Button onClick={() => void save()} disabled={!name.trim() || saving}>
+        <Button type="button" onClick={() => void save()} disabled={!name.trim() || saving}>
           {saving ? 'Guardando…' : 'Guardar. A partir de ahora usan esta versión; lo ya cargado queda.'}
         </Button>
       </div>
+      <Sheet open={savedOpen} title="Plantilla guardada" onClose={() => setSavedOpen(false)}>
+        <p>
+          Quienes ya tenían este cuestionario pasan a esta versión. Lo que ya cargaron no se borra. Si alguien tiene otra
+          plantilla, se cambia en su ficha.
+        </p>
+      </Sheet>
     </ProLayout>
   );
 }
