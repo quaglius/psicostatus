@@ -8,9 +8,10 @@ interface SheetProps {
   children: ReactNode;
   onClose: () => void;
   actions?: ReactNode;
+  size?: 'md' | 'lg';
 }
 
-export function Sheet({ open, title, children, onClose, actions }: SheetProps) {
+export function Sheet({ open, title, children, onClose, actions, size = 'md' }: SheetProps) {
   if (!open) return null;
 
   return (
@@ -20,7 +21,10 @@ export function Sheet({ open, title, children, onClose, actions }: SheetProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-title"
-        className="relative z-10 flex max-h-[min(88dvh,640px)] w-full max-w-md flex-col rounded-t-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-soft)] sm:rounded-[var(--radius-card)]"
+        className={[
+          'relative z-10 flex w-full flex-col rounded-t-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-soft)] sm:rounded-[var(--radius-card)]',
+          size === 'lg' ? 'max-h-[min(92dvh,840px)] max-w-[420px]' : 'max-h-[min(88dvh,640px)] max-w-md',
+        ].join(' ')}
       >
         <div className="flex justify-center pt-2 sm:hidden" aria-hidden>
           <div className="h-1 w-10 rounded-full bg-[var(--line)]" />

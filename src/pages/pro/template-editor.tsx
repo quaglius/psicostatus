@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowDown, ArrowUp, Eye, Trash2 } from 'lucide-react';
 import { apiFetch, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Sheet } from '@/components/ui/Sheet';
 import { PageSkeleton } from '@/components/skeleton';
+import { TemplatePreview } from '@/components/template-preview';
 import { FieldTypeIcon, PeriodicityIcon } from '@/lib/field-icons';
 import { FIELD_TYPE, PERIODICITY } from '@/lib/labels';
 import { DEFAULT_TEMPLATE_FIELDS } from '@shared/fields';
@@ -30,12 +31,14 @@ export function TemplateEditorPage() {
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'nueva';
   const navigate = useNavigate();
+  const location = useLocation();
   const { me } = useAuth();
   const workspace = me?.workspaceMemberships[0];
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedOpen, setSavedOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [fields, setFields] = useState<FieldDefinition[]>(DEFAULT_TEMPLATE_FIELDS);
   const [periodicityType, setPeriodicityType] = useState<PeriodicityType>('daily');
   const [everyNDays, setEveryNDays] = useState(3);
@@ -60,6 +63,13 @@ export function TemplateEditorPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'No pudimos abrir la plantilla'))
       .finally(() => setLoading(false));
   }, [id, isNew]);
+
+  useEffect(() => {
+    const state = location.state as { justSaved?: boolean } | null;
+    if (!state?.justSaved) return;
+    setSavedOpen(true);
+    navigate('.', { replace: true, state: {} });
+  }, [location.state, navigate]);
 
   const moveField = (index: number, direction: -1 | 1) => {
     const next = [...fields];
@@ -126,7 +136,7 @@ export function TemplateEditorPage() {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        navigate(`/pro/plantillas/${created.template.id}`, { replace: true });
+        navigate(`/pro/plantillas/${created.template.id}`, { replace: true, state: { justSaved: true } });
       } else if (id) {
         await apiFetch(`templates/${id}`, { method: 'POST', body: JSON.stringify({ name }) });
         await apiFetch(`templates/${id}/versions`, {
@@ -307,15 +317,62 @@ export function TemplateEditorPage() {
           </div>
         </div>
 
-        <Button type="button" onClick={() => void save()} disabled={!name.trim() || saving}>
-          {saving ? 'Guardando…' : 'Guardar. A partir de ahora usan esta versión; lo ya cargado queda.'}
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)} disabled={!fields.length}>
+            <Eye size={18} /> Ver cómo lo ve el paciente
+          </Button>
+          <Button type="button" onClick={() => void save()} disabled={!name.trim() || saving}>
+            {saving ? 'Guardando…' : 'Guardar. A partir de ahora usan esta versión; lo ya cargado queda.'}
+          </Button>
+        </div>
       </div>
-      <Sheet open={savedOpen} title="Plantilla guardada" onClose={() => setSavedOpen(false)}>
-        <p>
+      <Sheet
+        open={previewOpen}
+        title="Vista previa"
+        size="lg"
+        onClose={() => setPreviewOpen(false)}
+        actions={
+          <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
+            Seguir editando
+          </Button>
+        }
+      >
+        <p className="mb-4 text-sm text-[var(--ink-soft)]">
+          Esto es lo que vería ahora, con los cambios que todavía no guardaste. Podés tocar los campos para probarlos;
+          no se envía nada.
+        </p>
+        {previewOpen ? (
+          <TemplatePreview
+            name={name}
+            fields={fields}
+            patientGuide={patientGuide}
+            periodicityType={periodicityType}
+            everyNDays={everyNDays}
+            weekdays={weekdays}
+          />
+        ) : null}
+      </Sheet>
+      <Sheet
+        open={savedOpen}
+        title="Plantilla guardada"
+        size="lg"
+        onClose={() => setSavedOpen(false)}
+        actions={<Button onClick={() => setSavedOpen(false)}>Entendido</Button>}
+      >
+        <p className="mb-4 text-sm text-[var(--ink-soft)]">
           Quienes ya tenían este cuestionario pasan a esta versión. Lo que ya cargaron no se borra. Si alguien tiene otra
           plantilla, se cambia en su ficha.
         </p>
+        {savedOpen ? (
+          <TemplatePreview
+            name={name}
+            fields={fields}
+            patientGuide={patientGuide}
+            periodicityType={periodicityType}
+            everyNDays={everyNDays}
+            weekdays={weekdays}
+          />
+        ) : null}
       </Sheet>
     </ProLayout>
   );
