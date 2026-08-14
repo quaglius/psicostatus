@@ -113,7 +113,10 @@ export function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-[1080px] px-5 pb-16">
-        <h2 className="font-display mb-6 text-3xl">Qué puede cargar el paciente</h2>
+        <h2 className="font-display mb-3 text-3xl">Qué puede cargar el paciente</h2>
+        <p className="mb-8 max-w-2xl text-[var(--ink-soft)]">
+          El profesional arma plantillas: formularios que se pueden cambiar. Preguntas, cada cuánto se pide una carga, y una nota de ayuda si hace falta. Por ejemplo, una plantilla puede incluir cosas como estas:
+        </p>
         <ul className="grid gap-6 md:grid-cols-3">
           <li className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5">
             <Heart className="mb-3 text-[var(--clay)]" />
@@ -180,18 +183,18 @@ export function LandingPage() {
           {[
             {
               n: '01',
-              t: 'Armás tu espacio',
-              d: 'Le ponés un nombre. Consultorio, grupo o clínica. Ya hay un cuestionario listo: ánimo, medicación y notas.',
+              t: 'El profesional arma el espacio',
+              d: 'Le pone un nombre al consultorio. Ya hay un formulario listo, y se puede crear otros: cada cuánto cargar, qué preguntar, y cuál usan las personas nuevas.',
             },
             {
               n: '02',
-              t: 'Le pasás un link',
-              d: 'Lo copiás y lo mandás por WhatsApp o mail. La persona crea cuenta o entra. Pone su nombre. Empieza el mismo día.',
+              t: 'Se comparte un link',
+              d: 'Se copia y se manda por WhatsApp o mail. Si es la primera vez, la persona crea cuenta. Si ya tiene, entra con la misma. El profesional que abre su propio link vuelve a su espacio.',
             },
             {
               n: '03',
-              t: 'Ves la semana',
-              d: 'Quién cargó, quién no, qué dijo. Números y gráficos para vos. El paciente solo ve su día.',
+              t: 'Cada quien ve lo suyo',
+              d: 'El paciente carga el día en el teléfono y puede mirar su historial. El profesional ve la lista, la cinta de la semana, gráficos y el texto completo, para llegar a la sesión con contexto.',
             },
           ].map((item) => (
             <li key={item.n}>
@@ -206,7 +209,7 @@ export function LandingPage() {
       <section className="mx-auto max-w-[640px] px-5 pb-16 text-center">
         <h2 className="font-display text-3xl">La semana, de un vistazo</h2>
         <p className="mt-3 text-[var(--ink-soft)]">
-          Lun a Dom. La tilde es “ya cargó”. El círculo vacío es “se esperaba y no llegó”. Tocás un día y leés todo.
+          De lunes a domingo, con el número del día. La tilde marca que ese día ya hay una carga. El círculo vacío, que se esperaba y no llegó. El anillo señala el día de hoy. Se toca un día para leerlo entero —sin recortes— y, si faltaba, se puede completar.
         </p>
         <div className="landing-week mx-auto mt-6 max-w-md" aria-hidden>
           {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d, i) => (
