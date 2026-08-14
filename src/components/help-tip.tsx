@@ -3,7 +3,7 @@ import { CircleHelp } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 
-export function HelpTip({ title, text }: { title?: string; text: string }) {
+export function HelpTip({ title, text, label = 'Cómo cargar' }: { title?: string; text: string; label?: string }) {
   const [open, setOpen] = useState(false);
   if (!text.trim()) return null;
 
@@ -11,11 +11,12 @@ export function HelpTip({ title, text }: { title?: string; text: string }) {
     <>
       <button
         type="button"
-        className="inline-flex items-center gap-1 rounded-full p-1 text-[var(--sage)] transition-transform duration-150 hover:bg-[var(--sage-soft)] active:scale-95"
-        aria-label="Ver explicación"
+        className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-sm text-[var(--sage)] transition-transform duration-150 hover:bg-[var(--sage-soft)] active:scale-95"
+        aria-label={`${label}. Ver explicación`}
         onClick={() => setOpen(true)}
       >
-        <CircleHelp size={20} />
+        <CircleHelp size={18} aria-hidden />
+        <span className="font-medium">{label}</span>
       </button>
       <Sheet
         open={open}

@@ -230,9 +230,8 @@ export function PatientTodayPage() {
           {canMutate || !selectedDay?.isFilled ? (
             <>
               {templateVersion.patientGuide ? (
-                <p className="mb-3 flex items-center gap-2 text-sm text-[var(--ink-soft)]">
+                <p className="mb-3 text-sm text-[var(--ink-soft)]">
                   <HelpTip title="Qué te pedimos hoy" text={templateVersion.patientGuide} />
-                  Tocá el ícono si no sabés cómo completar.
                 </p>
               ) : null}
               <EntryForm fields={templateVersion.fields} values={values} onChange={setValues} errors={errors} />
