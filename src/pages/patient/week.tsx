@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
@@ -6,12 +6,11 @@ import { PatientLayout } from '@/components/layout/PatientLayout';
 import { Card } from '@/components/ui/Card';
 import { EntryReadout } from '@/components/entry-readout';
 import { DateRange } from '@/components/date-range';
-import { FieldReports } from '@/components/field-reports';
 import { HelpTip } from '@/components/help-tip';
 import { PageSkeleton } from '@/components/skeleton';
 import { ListToolbar, Pagination, SortHeader, usePagedSort, type SortDir } from '@/components/paged-list';
 import { addDays, formatDateAR, formatDateISO, todayInAR } from '@shared/periodicity';
-import { buildFieldReports, filterEntriesByDate } from '@shared/report';
+import { filterEntriesByDate } from '@shared/report';
 import type { EntryDoc, TemplateVersionDoc } from '@shared/types';
 
 export function PatientWeekPage() {
@@ -46,10 +45,6 @@ export function PatientWeekPage() {
 
   const workspaces = memberships.map((m) => ({ id: m.workspace.id, name: m.workspace.name }));
   const filtered = filterEntriesByDate(entries ?? [], from, to);
-  const reports = useMemo(
-    () => (templateVersion ? buildFieldReports(filtered, templateVersion.fields) : []),
-    [filtered, templateVersion],
-  );
   const paged = usePagedSort(filtered, {
     search,
     match: (e, q) => `${e.entryDate} ${JSON.stringify(e.values)}`.toLowerCase().includes(q),
@@ -72,7 +67,9 @@ export function PatientWeekPage() {
           <HelpTip title="Qué te pedimos" text={templateVersion.patientGuide} />
         ) : null}
       </h1>
-      <p className="mb-6 text-sm text-[var(--ink-soft)]">Todo lo que fuiste cargando, completo. Los días viejos no se editan.</p>
+      <p className="mb-6 text-sm text-[var(--ink-soft)]">
+        Lo que fuiste cargando, día por día. Los días viejos no se editan.
+      </p>
 
       <div className="mb-6">
         <DateRange
@@ -91,9 +88,6 @@ export function PatientWeekPage() {
         <PageSkeleton />
       ) : (
         <>
-          <div className="mb-6">
-            <FieldReports reports={reports} />
-          </div>
           <div className="mb-4">
             <ListToolbar search={search} onSearch={setSearch} placeholder="Buscar en tus cargas..." />
             <SortHeader
