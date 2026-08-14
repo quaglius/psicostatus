@@ -81,21 +81,72 @@
   gap: 6px;
 }
 
-.landing-week span {
-  min-height: 52px;
+.landing-week-day {
+  min-height: 72px;
   border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-size: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   padding: 8px 2px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.landing-week-day em {
+  font-style: normal;
+  font-size: 0.65rem;
   color: var(--ink-soft);
+}
+
+.landing-week-day strong {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.landing-week-day i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.landing-week-day.is-filled {
+  background: var(--sage-soft);
+  border-color: transparent;
+}
+
+.landing-week-day.is-filled svg {
+  color: var(--sage);
+}
+
+.landing-week-day.is-missed i {
+  border: 2px solid var(--clay);
+}
+
+.landing-week-day.is-today {
+  box-shadow: inset 0 0 0 2px var(--clay);
+}
+
+.landing-week-day.is-today i {
+  box-shadow: 0 0 0 2px var(--clay);
+}
+
+.landing-week-day.is-future {
+  opacity: 0.4;
   background: var(--empty);
 }
 
-.landing-week span.on {
-  background: var(--sage-soft);
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1.5px var(--clay-soft);
+.landing-week-day.is-future i {
+  background: transparent;
+}
+
+.landing-fold-list {
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 720px) {

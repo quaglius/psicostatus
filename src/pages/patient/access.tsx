@@ -15,13 +15,13 @@ export function PatientAccessPage() {
         <div>
           <h1 className="font-display text-2xl text-[var(--ink)]">Soy paciente</h1>
           <p className="mt-2 text-[var(--ink-soft)]">
-            Para usar la plataforma necesitás que tu psicólogo o psiquiatra te invite con un link. Abrí ese link en el
-            celular o en la computadora: ahí podés crear tu cuenta o ingresar si ya la tenés.
+            Tu psicólogo o psiquiatra te invita con un link. Abrilo en el celular o en la computadora: ahí creás tu
+            cuenta o ingresás si ya la tenés. Así quedás vinculado a tu consultorio.
           </p>
         </div>
         <div className="rounded-[var(--radius-input)] border border-[var(--sage)] bg-[var(--sage-soft)] px-4 py-3 text-sm text-[var(--ink-soft)]">
-          <p className="font-medium text-[var(--ink)]">¿Todavía no tenés link?</p>
-          <p className="mt-1">Pedile a tu profesional que te invite a usar {APP_NAME}.</p>
+          <p className="font-medium text-[var(--ink)]">¿Todavía no te pasaron el link?</p>
+          <p className="mt-1">Pedíselo a tu profesional, con tranquilidad. Es la forma de empezar a usar {APP_NAME}.</p>
         </div>
         <Link to="/ingresar" className="block hover:no-underline">
           <Button variant="secondary" fullWidth>
