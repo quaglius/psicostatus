@@ -56,4 +56,5 @@ export const COLLECTIONS = {
   assignments: 'assignments',
   entries: 'entries',
   inviteLinks: 'inviteLinks',
+  professionalNotes: 'professionalNotes',
 } as const;

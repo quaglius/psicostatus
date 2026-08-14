@@ -36,7 +36,7 @@ export function OnboardingPage() {
     return <Navigate to="/admin" replace />;
   }
   if (me.workspaceMemberships.length) {
-    return <Navigate to="/pro/pacientes" replace />;
+    return <Navigate to="/pro/espacio" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,8 +78,8 @@ export function OnboardingPage() {
             Tu espacio está creado. Ya copiamos el link para invitar pacientes: pegalo en WhatsApp o mail.
           </p>
           <p className="break-all text-xs text-[var(--ink-soft)]">{inviteUrl}</p>
-          <Button fullWidth onClick={() => navigate('/pro/pacientes')}>
-            Ir a pacientes
+          <Button fullWidth onClick={() => navigate('/pro/espacio')}>
+            Ir a tu espacio
           </Button>
         </Card>
       </div>

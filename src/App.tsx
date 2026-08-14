@@ -6,6 +6,8 @@ import { OnboardingPage } from '@/pages/pro/onboarding';
 import { PatientsPage } from '@/pages/pro/patients';
 import { PatientDetailPage } from '@/pages/pro/patient-detail';
 import { TemplatesPage } from '@/pages/pro/templates';
+import { TemplateEditorPage } from '@/pages/pro/template-editor';
+import { ScreenSkeleton } from '@/components/skeleton';
 import { TeamPage } from '@/pages/pro/team';
 import { WorkspacePage } from '@/pages/pro/workspace';
 import { InvitePage } from '@/pages/patient/invite';
@@ -19,14 +21,14 @@ import { appHomePath } from '@/lib/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { firebaseUser, loading } = useAuth();
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-[var(--ink-soft)]">Cargando...</div>;
+  if (loading) return <ScreenSkeleton />;
   if (!firebaseUser) return <Navigate to="/ingresar" replace />;
   return <>{children}</>;
 }
 
 function AppRedirect() {
   const { me, loading, refreshMe } = useAuth();
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-[var(--ink-soft)]">Cargando...</div>;
+  if (loading) return <ScreenSkeleton />;
   if (!me) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[var(--paper)] px-4 text-center">
@@ -42,7 +44,7 @@ function AppRedirect() {
 
 function GuestOnly({ children }: { children: React.ReactNode }) {
   const { firebaseUser, me, loading } = useAuth();
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-[var(--ink-soft)]">Cargando...</div>;
+  if (loading) return <ScreenSkeleton />;
   if (firebaseUser) return <Navigate to={appHomePath(me)} replace />;
   return <>{children}</>;
 }
@@ -100,10 +102,34 @@ export function App() {
         }
       />
       <Route
+        path="/pro/pacientes/:id/:seccion"
+        element={
+          <RequireAuth>
+            <PatientDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/pro/plantillas"
         element={
           <RequireAuth>
             <TemplatesPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/pro/plantillas/nueva"
+        element={
+          <RequireAuth>
+            <TemplateEditorPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/pro/plantillas/:id"
+        element={
+          <RequireAuth>
+            <TemplateEditorPage />
           </RequireAuth>
         }
       />

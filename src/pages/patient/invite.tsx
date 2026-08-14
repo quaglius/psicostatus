@@ -3,52 +3,72 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthForm } from '@/pages/auth';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import { ScreenSkeleton } from '@/components/skeleton';
 import { MEMBER_ROLE } from '@/lib/labels';
 import type { WorkspaceMemberRole } from '@shared/types';
+
+interface InviteInfo {
+  workspaceId: string;
+  workspaceName: string;
+  kind: string;
+  role: string | null;
+}
 
 export function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { firebaseUser, refreshMe } = useAuth();
-  const [invite, setInvite] = useState<{ workspaceName: string; kind: string; role: string | null } | null>(null);
+  const { firebaseUser, me, loading: authLoading, refreshMe } = useAuth();
+  const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [error, setError] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<{ workspaceName: string; kind: string; role: string | null }>(`invite/${token}`)
+    apiFetch<InviteInfo>(`invite/${token}`)
       .then(setInvite)
       .catch((err) => setError(err.message));
   }, [token]);
 
   useEffect(() => {
-    if (firebaseUser && invite) {
-      if (invite.kind !== 'patient') {
-        acceptStaff();
-      }
+    if (!token || !invite || authLoading || !firebaseUser || !me || joining) return;
+
+    const staffHere = me.workspaceMemberships.some((m) => m.workspace.id === invite.workspaceId);
+    const patientHere = me.patientMemberships.some((m) => m.workspace.id === invite.workspaceId);
+
+    if (staffHere) {
+      navigate('/pro/espacio', { replace: true });
+      return;
     }
-  }, [firebaseUser, invite]);
+    if (patientHere && invite.kind === 'patient') {
+      navigate('/paciente/hoy', { replace: true });
+      return;
+    }
 
-  const acceptStaff = async () => {
-    if (!token) return;
-    await apiFetch('invites/accept', { method: 'POST', body: JSON.stringify({ token }) });
-    await refreshMe();
-    navigate('/pro/pacientes');
-  };
+    const accept = async () => {
+      setJoining(true);
+      try {
+        const names = me.user.displayName?.trim().split(/\s+/) ?? [];
+        const firstName = names[0] || me.patientMemberships[0]?.firstName;
+        const lastName = names.slice(1).join(' ') || me.patientMemberships[0]?.lastName;
+        const res = await apiFetch<{ type: string }>(`invites/accept`, {
+          method: 'POST',
+          body: JSON.stringify({ token, firstName, lastName }),
+        });
+        await refreshMe();
+        if (res.type === 'already_professional' || res.type === 'already_staff' || res.type === 'staff') {
+          navigate('/pro/espacio', { replace: true });
+          return;
+        }
+        navigate('/paciente/hoy', { replace: true });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No pudimos unirte con este link');
+        setJoining(false);
+      }
+    };
 
-  const acceptPatient = async () => {
-    if (!token || !firstName.trim() || !lastName.trim()) return;
-    await apiFetch('invites/accept', {
-      method: 'POST',
-      body: JSON.stringify({ token, firstName, lastName }),
-    });
-    await refreshMe();
-    navigate('/paciente/hoy');
-  };
+    void accept();
+  }, [token, invite, authLoading, firebaseUser, me, joining, navigate, refreshMe]);
 
   if (error) {
     return (
@@ -62,49 +82,25 @@ export function InvitePage() {
     );
   }
 
-  if (!invite) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-[var(--ink-soft)]">Cargando...</p>
-      </div>
-    );
+  if (authLoading || !invite || firebaseUser) {
+    return <ScreenSkeleton />;
   }
 
   if (!firebaseUser) {
     return (
       <AuthForm
-        mode="register"
+        mode="login"
         allowSwitch
         title={`Te invita ${invite.workspaceName}`}
         subtitle={
           invite.kind === 'staff'
-            ? `${MEMBER_ROLE[(invite.role as WorkspaceMemberRole) || 'professional'].label}. Creá tu cuenta o ingresá si ya tenés una.`
-            : 'Creá tu cuenta o ingresá si ya tenés una.'
+            ? `${MEMBER_ROLE[(invite.role as WorkspaceMemberRole) || 'professional'].label}. Si ya tenés cuenta, ingresá. Si es la primera vez, creá una.`
+            : 'Si ya tenés cuenta, ingresá y te llevamos. Si es la primera vez, creá una y empezá a cargar.'
         }
         redirectTo={`/i/${token}`}
       />
     );
   }
 
-  if (invite.kind === 'staff') {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Button onClick={acceptStaff}>Unirme al espacio</Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] px-4">
-      <Card className="w-full max-w-md space-y-4">
-        <h1 className="font-display text-2xl">Bienvenido/a a {invite.workspaceName}</h1>
-        <p className="text-sm text-[var(--ink-soft)]">Contanos cómo te llamás.</p>
-        <Input label="Nombre" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-        <Input label="Apellido" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-        <Button fullWidth onClick={acceptPatient} disabled={!firstName.trim() || !lastName.trim()}>
-          Empezar
-        </Button>
-      </Card>
-    </div>
-  );
+  return <ScreenSkeleton />;
 }

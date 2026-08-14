@@ -3,8 +3,8 @@ import type { MeResponse } from '@shared/types';
 export function appHomePath(me: MeResponse | null): string {
   if (!me) return '/app';
   if (me.user.platformRole === 'global_admin') return '/admin';
+  if (me.workspaceMemberships.length) return '/pro/espacio';
   if (me.patientMemberships.length) return '/paciente/hoy';
-  if (me.workspaceMemberships.length) return '/pro/pacientes';
   return '/pro/onboarding';
 }
 

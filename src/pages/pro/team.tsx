@@ -6,6 +6,7 @@ import { ProLayout } from '@/components/layout/ProLayout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/avatar';
+import { ListToolbar, Pagination, SortHeader, usePagedSort, type SortDir } from '@/components/paged-list';
 import { MEMBER_ROLE } from '@/lib/labels';
 import type { WorkspaceMemberRole } from '@shared/types';
 
@@ -23,6 +24,10 @@ export function TeamPage() {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [role, setRole] = useState<WorkspaceMemberRole>('professional');
   const [copied, setCopied] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   const load = async () => {
     if (!workspace) return;
@@ -46,6 +51,7 @@ export function TeamPage() {
       }),
     });
     const url = `${window.location.origin}/i/${res.token}`;
+    setInviteUrl(url);
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -59,6 +65,20 @@ export function TeamPage() {
   };
 
   const isAdmin = workspace?.role === 'admin' || me?.user.platformRole === 'global_admin';
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+  const { pageItems, page, setPage, pageCount, total } = usePagedSort(members, {
+    search,
+    match: (m, q) => `${m.displayName ?? ''} ${m.email} ${MEMBER_ROLE[m.role].label}`.toLowerCase().includes(q),
+    sortKey,
+    sortDir,
+    value: (m, key) => (key === 'email' ? m.email : key === 'role' ? MEMBER_ROLE[m.role].label : (m.displayName ?? m.email).toLowerCase()),
+  });
 
   return (
     <ProLayout workspaceName={workspace?.workspace.name}>
@@ -73,31 +93,45 @@ export function TeamPage() {
             <p className="text-[var(--ink-soft)]">Todavía no hay nadie en la lista. Invitá con el link de abajo.</p>
           </Card>
         ) : (
-          members.map((m) => (
-            <Card key={m.id} className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar name={m.displayName ?? m.email} />
-                <div className="min-w-0">
-                  <p className="font-medium">{m.displayName ?? m.email}</p>
-                  <p className="text-sm text-[var(--ink-soft)]">{m.email}</p>
-                  <p className="text-sm text-[var(--sage)]">{MEMBER_ROLE[m.role].label}</p>
+          <>
+            <ListToolbar search={search} onSearch={setSearch} placeholder="Buscar por nombre o correo..." />
+            <SortHeader
+              columns={[
+                { key: 'name', label: 'Nombre' },
+                { key: 'email', label: 'Correo' },
+                { key: 'role', label: 'Rol' },
+              ]}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            {pageItems.map((m) => (
+              <Card key={m.id} className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar name={m.displayName ?? m.email} />
+                  <div className="min-w-0">
+                    <p className="font-medium">{m.displayName ?? m.email}</p>
+                    <p className="text-sm text-[var(--ink-soft)]">{m.email}</p>
+                    <p className="text-sm text-[var(--sage)]">{MEMBER_ROLE[m.role].label}</p>
+                  </div>
                 </div>
-              </div>
-              {isAdmin && m.userId !== me?.user.id ? (
-                <Button variant="ghost" onClick={() => removeMember(m.id)}>
-                  <UserMinus size={16} />
-                  Sacar
-                </Button>
-              ) : null}
-            </Card>
-          ))
+                {isAdmin && m.userId !== me?.user.id ? (
+                  <Button variant="ghost" onClick={() => removeMember(m.id)}>
+                    <UserMinus size={16} />
+                    Sacar
+                  </Button>
+                ) : null}
+              </Card>
+            ))}
+            <Pagination page={page} pageCount={pageCount} total={total} onPage={setPage} />
+          </>
         )}
       </div>
 
       {isAdmin ? (
         <Card className="space-y-4">
           <h2 className="font-display text-xl">Invitar a alguien</h2>
-          <p className="text-sm text-[var(--ink-soft)]">Elegí qué va a poder hacer y copiá el link. Se lo pasás por WhatsApp o mail.</p>
+          <p className="text-sm text-[var(--ink-soft)]">Elegí qué va a poder hacer y copiá el link. Si ya tiene cuenta, ingresa y entra al espacio. Si es nuevo, se registra. Si lo abrís vos, vas a tu espacio.</p>
           <fieldset className="space-y-3">
             {(Object.keys(MEMBER_ROLE) as WorkspaceMemberRole[]).map((r) => (
               <label key={r} className="flex items-start gap-2">
@@ -110,6 +144,7 @@ export function TeamPage() {
             ))}
           </fieldset>
           <Button onClick={inviteStaff}>{copied ? 'Link copiado' : 'Copiar link de invitación'}</Button>
+          {inviteUrl ? <p className="break-all text-sm text-[var(--ink-soft)]">{inviteUrl}</p> : null}
         </Card>
       ) : (
         <p className="text-[var(--ink-soft)]">Solo quien administra el espacio puede invitar o sacar gente.</p>

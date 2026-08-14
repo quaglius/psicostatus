@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { formatDateTimeAR, formatEntryPreview } from '@shared/periodicity';
 import { WORKSPACE_KIND } from '@/lib/labels';
+import { ListToolbar, Pagination, SortHeader, usePagedSort, type SortDir } from '@/components/paged-list';
 import type { EntryDoc, UserDoc, WorkspaceDoc } from '@shared/types';
 
 export function AdminPage() {
@@ -72,48 +73,147 @@ export function AdminPage() {
         ) : null}
 
         {tab === 'users' ? (
-          <div className="space-y-2">
-            {users.map((u) => (
-              <Card key={u.id} className="flex items-center justify-between">
-                <div>
-                  <p>{u.email}</p>
-                  <p className="text-sm text-[var(--ink-soft)]">{u.platformRole === 'global_admin' ? 'Administración de la plataforma' : 'Cuenta'}</p>
-                </div>
-                {!u.disabledAt ? (
-                  <Button variant="danger" onClick={() => disableUser(u.id)}>
-                    Desactivar
-                  </Button>
-                ) : (
-                  <span className="text-sm text-[var(--danger)]">Desactivado</span>
-                )}
-              </Card>
-            ))}
-          </div>
+          <AdminUsers users={users} disableUser={disableUser} />
         ) : null}
 
-        {tab === 'workspaces' ? (
-          <div className="space-y-2">
-            {workspaces.map((w) => (
-              <Card key={w.id}>
-                <p className="font-medium">{w.name}</p>
-                <p className="text-sm text-[var(--ink-soft)]">{WORKSPACE_KIND[w.kind].label}</p>
-              </Card>
-            ))}
-          </div>
-        ) : null}
+        {tab === 'workspaces' ? <AdminWorkspaces workspaces={workspaces} /> : null}
 
-        {tab === 'entries' ? (
-          <div className="space-y-2">
-            {entries.map((e) => (
-              <Card key={e.id}>
-                <p className="text-sm text-[var(--ink-soft)]">{e.entryDate}</p>
-                <p>{formatEntryPreview(e.values)}</p>
-                <p className="text-xs text-[var(--ink-soft)]">{formatDateTimeAR(e.createdAt)}</p>
-              </Card>
-            ))}
-          </div>
-        ) : null}
+        {tab === 'entries' ? <AdminEntries entries={entries} /> : null}
       </main>
     </div>
+  );
+}
+
+function toggle(current: string, key: string, dir: SortDir, setKey: (k: string) => void, setDir: (d: SortDir) => void) {
+  if (current === key) setDir(dir === 'asc' ? 'desc' : 'asc');
+  else {
+    setKey(key);
+    setDir('asc');
+  }
+}
+
+function AdminUsers({
+  users,
+  disableUser,
+}: {
+  users: Array<UserDoc & { id: string }>;
+  disableUser: (id: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('email');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const paged = usePagedSort(users, {
+    search,
+    match: (u, q) => `${u.email} ${u.displayName ?? ''}`.toLowerCase().includes(q),
+    sortKey,
+    sortDir,
+    value: (u, key) => (key === 'role' ? u.platformRole : key === 'created' ? u.createdAt : u.email),
+  });
+  return (
+    <>
+      <ListToolbar search={search} onSearch={setSearch} placeholder="Buscar usuario..." />
+      <SortHeader
+        columns={[
+          { key: 'email', label: 'Correo' },
+          { key: 'role', label: 'Rol' },
+          { key: 'created', label: 'Alta' },
+        ]}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={(key) => toggle(sortKey, key, sortDir, setSortKey, setSortDir)}
+      />
+      <div className="space-y-2">
+        {paged.pageItems.map((u) => (
+          <Card key={u.id} className="flex items-center justify-between">
+            <div>
+              <p>{u.email}</p>
+              <p className="text-sm text-[var(--ink-soft)]">{u.platformRole === 'global_admin' ? 'Administración de la plataforma' : 'Cuenta'}</p>
+            </div>
+            {!u.disabledAt ? (
+              <Button variant="danger" onClick={() => disableUser(u.id)}>
+                Desactivar
+              </Button>
+            ) : (
+              <span className="text-sm text-[var(--danger)]">Desactivado</span>
+            )}
+          </Card>
+        ))}
+      </div>
+      <Pagination page={paged.page} pageCount={paged.pageCount} total={paged.total} onPage={paged.setPage} />
+    </>
+  );
+}
+
+function AdminWorkspaces({ workspaces }: { workspaces: Array<WorkspaceDoc & { id: string }> }) {
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const paged = usePagedSort(workspaces, {
+    search,
+    match: (w, q) => `${w.name} ${WORKSPACE_KIND[w.kind].label}`.toLowerCase().includes(q),
+    sortKey,
+    sortDir,
+    value: (w, key) => (key === 'kind' ? WORKSPACE_KIND[w.kind].label : key === 'created' ? w.createdAt : w.name.toLowerCase()),
+  });
+  return (
+    <>
+      <ListToolbar search={search} onSearch={setSearch} placeholder="Buscar espacio..." />
+      <SortHeader
+        columns={[
+          { key: 'name', label: 'Nombre' },
+          { key: 'kind', label: 'Tipo' },
+          { key: 'created', label: 'Alta' },
+        ]}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={(key) => toggle(sortKey, key, sortDir, setSortKey, setSortDir)}
+      />
+      <div className="space-y-2">
+        {paged.pageItems.map((w) => (
+          <Card key={w.id}>
+            <p className="font-medium">{w.name}</p>
+            <p className="text-sm text-[var(--ink-soft)]">{WORKSPACE_KIND[w.kind].label}</p>
+          </Card>
+        ))}
+      </div>
+      <Pagination page={paged.page} pageCount={paged.pageCount} total={paged.total} onPage={paged.setPage} />
+    </>
+  );
+}
+
+function AdminEntries({ entries }: { entries: Array<EntryDoc & { id: string }> }) {
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const paged = usePagedSort(entries, {
+    search,
+    match: (e, q) => `${e.entryDate} ${formatEntryPreview(e.values)}`.toLowerCase().includes(q),
+    sortKey,
+    sortDir,
+    value: (e, key) => (key === 'created' ? e.createdAt : e.entryDate),
+  });
+  return (
+    <>
+      <ListToolbar search={search} onSearch={setSearch} placeholder="Buscar cargas..." />
+      <SortHeader
+        columns={[
+          { key: 'date', label: 'Día' },
+          { key: 'created', label: 'Cargado' },
+        ]}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={(key) => toggle(sortKey, key, sortDir, setSortKey, setSortDir)}
+      />
+      <div className="space-y-2">
+        {paged.pageItems.map((e) => (
+          <Card key={e.id}>
+            <p className="text-sm text-[var(--ink-soft)]">{e.entryDate}</p>
+            <p>{formatEntryPreview(e.values)}</p>
+            <p className="text-xs text-[var(--ink-soft)]">{formatDateTimeAR(e.createdAt)}</p>
+          </Card>
+        ))}
+      </div>
+      <Pagination page={paged.page} pageCount={paged.pageCount} total={paged.total} onPage={paged.setPage} />
+    </>
   );
 }

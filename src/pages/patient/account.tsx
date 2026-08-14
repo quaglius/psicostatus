@@ -44,7 +44,10 @@ export function PatientAccountPage() {
   };
 
   return (
-    <PatientLayout>
+    <PatientLayout
+      workspaceName={membership?.workspace.name}
+      workspaceImageUrl={membership?.workspace.imageUrl}
+    >
       <h1 className="font-display mb-6 text-2xl">Tu cuenta</h1>
 
       <Card className="space-y-4">

@@ -91,6 +91,7 @@ export interface TemplateVersionDoc {
   periodicityType: PeriodicityType;
   periodicityConfig: PeriodicityConfig;
   fields: FieldDefinition[];
+  patientGuide: string | null;
   createdAt: string;
 }
 
@@ -114,6 +115,14 @@ export interface EntryDoc {
   updatedAt: string;
 }
 
+export interface ProfessionalNoteDoc {
+  workspaceId: string;
+  workspacePatientId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface InviteLinkDoc {
   workspaceId: string;
   kind: InviteKind;
@@ -128,6 +137,7 @@ export interface InviteLinkDoc {
   assignToMemberId: string | null;
   seeAllPatients: boolean;
   createdAt: string;
+  token?: string | null;
 }
 
 export interface ApiError {

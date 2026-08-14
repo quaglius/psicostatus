@@ -6,6 +6,7 @@ import type {
   EntryDoc,
   InviteLinkDoc,
   MeResponse,
+  ProfessionalNoteDoc,
   TemplateDoc,
   TemplateVersionDoc,
   UserDoc,
@@ -13,6 +14,7 @@ import type {
   WorkspaceMemberDoc,
   WorkspacePatientDoc,
 } from '../../../shared/types';
+import { buildFieldReports, dailyCounts, mergeFieldReports, weekdayCounts } from '../../../shared/report';
 import {
   computeAdherence,
   computePeriodKey,
@@ -24,6 +26,7 @@ import {
   isFutureDate,
   parseISODate,
   startOfWeekMonday,
+  addDays,
 } from '../../../shared/periodicity';
 import { daysFromNow, generateInviteToken, hashToken, nowISO, todayISO, yesterdayISO } from '../../../shared/utils';
 import { validateEntryValues, validateFieldDefinitions } from '../../../shared/fields';
@@ -161,6 +164,8 @@ export async function handleCreateWorkspace(auth: AuthContext, event: HandlerEve
     periodicityType: 'daily',
     periodicityConfig: {},
     fields: DEFAULT_TEMPLATE_FIELDS,
+    patientGuide:
+      'Cada día, elegí cómo te sentís, si tomaste la medicación y, si querés, escribí una nota. No hay respuestas correctas.',
     createdAt: nowISO(),
   };
 
@@ -180,6 +185,7 @@ export async function handleCreateWorkspace(auth: AuthContext, event: HandlerEve
     assignToMemberId: auth.userId,
     seeAllPatients: false,
     createdAt: nowISO(),
+    token,
   };
 
   const batch = db.batch();
@@ -226,6 +232,7 @@ export async function handleGetInvite(token: string) {
   const workspace = ws.data() as WorkspaceDoc;
 
   return jsonResponse(200, {
+    workspaceId: invite.workspaceId,
     workspaceName: workspace.name,
     kind: invite.kind,
     role: invite.role,
@@ -273,7 +280,7 @@ export async function handleAcceptInvite(auth: AuthContext, event: HandlerEvent)
   if (invite.kind === 'staff') {
     const existing = await getWorkspaceMember(invite.workspaceId, auth.userId);
     if (existing) {
-      throw new ApiHttpError(409, 'ALREADY_MEMBER', 'Ya sos parte de este espacio');
+      return jsonResponse(200, { type: 'already_staff', workspaceId: invite.workspaceId });
     }
 
     const memberId = uuidv4();
@@ -299,7 +306,7 @@ export async function handleAcceptInvite(auth: AuthContext, event: HandlerEvent)
   // Patient invite
   const existingMember = await getWorkspaceMember(invite.workspaceId, auth.userId);
   if (existingMember) {
-    throw new ApiHttpError(409, 'PROFESSIONAL_CANNOT_BE_PATIENT', 'Esta cuenta es de profesional en este espacio');
+    return jsonResponse(200, { type: 'already_professional', workspaceId: invite.workspaceId });
   }
 
   const existingPatient = await db
@@ -317,9 +324,10 @@ export async function handleAcceptInvite(auth: AuthContext, event: HandlerEvent)
     });
   }
 
-  if (!body.firstName?.trim() || !body.lastName?.trim()) {
-    throw new ApiHttpError(400, 'INVALID_INPUT', 'Nombre y apellido son obligatorios');
-  }
+  const fromProfile = (auth.user.displayName ?? '').trim();
+  const [profileFirst, ...profileRest] = fromProfile.split(/\s+/);
+  const firstName = body.firstName?.trim() || profileFirst || (auth.email.split('@')[0] ?? 'Paciente');
+  const lastName = body.lastName?.trim() || (profileRest.length ? profileRest.join(' ') : '—');
 
   const defaultTemplate = await db
     .collection(COLLECTIONS.templates)
@@ -346,8 +354,8 @@ export async function handleAcceptInvite(auth: AuthContext, event: HandlerEvent)
   const patient: WorkspacePatientDoc = {
     workspaceId: invite.workspaceId,
     userId: auth.userId,
-    firstName: body.firstName.trim(),
-    lastName: body.lastName.trim(),
+    firstName,
+    lastName,
     photoUrl: null,
     birthDate: body.birthDate ?? null,
     phone: body.phone ?? null,
@@ -438,6 +446,7 @@ export async function handleCreateInvite(auth: AuthContext, event: HandlerEvent)
     assignToMemberId,
     seeAllPatients: body.seeAllPatients ?? false,
     createdAt: nowISO(),
+    token,
   };
 
   await getDb().collection(COLLECTIONS.inviteLinks).doc(inviteId).set(invite);
@@ -467,6 +476,7 @@ export async function handleRotateInvite(auth: AuthContext, inviteId: string) {
   const newInvite: InviteLinkDoc = {
     ...invite,
     tokenHash: hashToken(token),
+    token,
     revokedAt: null,
     expiresAt: daysFromNow(90),
     usedAt: null,
@@ -669,7 +679,12 @@ export async function handleListTemplates(auth: AuthContext, workspaceId: string
 }
 
 export async function handleCreateTemplate(auth: AuthContext, event: HandlerEvent) {
-  const body = parseBody<{ workspaceId: string; name: string; fields?: TemplateVersionDoc['fields'] }>(event);
+  const body = parseBody<{
+    workspaceId: string;
+    name: string;
+    fields?: TemplateVersionDoc['fields'];
+    patientGuide?: string | null;
+  }>(event);
   await assertWorkspaceStaff(auth.user, body.workspaceId, ['admin', 'professional']);
 
   const db = getDb();
@@ -690,6 +705,7 @@ export async function handleCreateTemplate(auth: AuthContext, event: HandlerEven
     periodicityType: 'daily',
     periodicityConfig: {},
     fields: validateFieldDefinitions(body.fields ?? DEFAULT_TEMPLATE_FIELDS),
+    patientGuide: body.patientGuide?.trim() || null,
     createdAt: nowISO(),
   };
 
@@ -713,6 +729,7 @@ export async function handleCreateTemplateVersion(auth: AuthContext, templateId:
     fields: TemplateVersionDoc['fields'];
     periodicityType: TemplateVersionDoc['periodicityType'];
     periodicityConfig: TemplateVersionDoc['periodicityConfig'];
+    patientGuide?: string | null;
     mutateIfNoEntries?: boolean;
   }>(event);
 
@@ -740,8 +757,16 @@ export async function handleCreateTemplateVersion(auth: AuthContext, templateId:
       fields,
       periodicityType: body.periodicityType ?? latest.periodicityType,
       periodicityConfig: body.periodicityConfig ?? latest.periodicityConfig,
+      patientGuide: body.patientGuide !== undefined ? body.patientGuide?.trim() || null : latest.patientGuide ?? null,
     });
-    return jsonResponse(200, { version: { id: latestDoc.id, ...latest, fields } });
+    return jsonResponse(200, {
+      version: {
+        id: latestDoc.id,
+        ...latest,
+        fields,
+        patientGuide: body.patientGuide !== undefined ? body.patientGuide?.trim() || null : latest.patientGuide ?? null,
+      },
+    });
   }
 
   const versionId = uuidv4();
@@ -751,6 +776,7 @@ export async function handleCreateTemplateVersion(auth: AuthContext, templateId:
     periodicityType: body.periodicityType ?? latest.periodicityType,
     periodicityConfig: body.periodicityConfig ?? latest.periodicityConfig,
     fields,
+    patientGuide: body.patientGuide !== undefined ? body.patientGuide?.trim() || null : latest.patientGuide ?? null,
     createdAt: nowISO(),
   };
 
@@ -821,14 +847,13 @@ export async function handleGetWeek(auth: AuthContext, patientId: string, from?:
   });
 }
 
-export async function handleListEntries(auth: AuthContext, patientId: string) {
+export async function handleListEntries(auth: AuthContext, patientId: string, from?: string, to?: string) {
   await assertCanSeePatient(auth.user, patientId);
   const db = getDb();
-  const snap = await db
-    .collection(COLLECTIONS.entries)
-    .where('workspacePatientId', '==', patientId)
-    .orderBy('entryDate', 'desc')
-    .get();
+  let query = db.collection(COLLECTIONS.entries).where('workspacePatientId', '==', patientId);
+  if (from) query = query.where('entryDate', '>=', from);
+  if (to) query = query.where('entryDate', '<=', to);
+  const snap = await query.orderBy('entryDate', 'desc').get();
 
   const entries = snap.docs.map((d) => ({ id: d.id, ...(d.data() as EntryDoc) }));
   return jsonResponse(200, { entries });
@@ -1018,30 +1043,36 @@ export async function handleDisableUser(auth: AuthContext, userId: string) {
   return jsonResponse(200, { ok: true });
 }
 
-export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: string) {
+export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: string, fromParam?: string, toParam?: string) {
   await assertWorkspaceStaff(auth.user, workspaceId);
   const patients = await listVisiblePatients(auth.user, workspaceId);
   const db = getDb();
 
-  const weekStart = formatDateISO(startOfWeekMonday(new Date()));
+  const to = toParam || todayInAR();
+  const from = fromParam || formatDateISO(addDays(parseISODate(to), -27));
+  const weekStart = formatDateISO(startOfWeekMonday(parseISODate(todayInAR())));
+
   let entriesThisWeek = 0;
   let totalAdherence = { expected: 0, filled: 0 };
-  const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
-  const weekLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const rangeEntries: EntryDoc[] = [];
+  const reports: ReturnType<typeof buildFieldReports> = [];
 
   for (const p of patients) {
     const entriesSnap = await db
       .collection(COLLECTIONS.entries)
       .where('workspacePatientId', '==', p.id)
+      .where('entryDate', '>=', from)
+      .where('entryDate', '<=', to)
+      .get();
+    const patientEntries = entriesSnap.docs.map((d) => d.data() as EntryDoc);
+    rangeEntries.push(...patientEntries);
+
+    const weekSnap = await db
+      .collection(COLLECTIONS.entries)
+      .where('workspacePatientId', '==', p.id)
       .where('entryDate', '>=', weekStart)
       .get();
-    entriesThisWeek += entriesSnap.size;
-    for (const doc of entriesSnap.docs) {
-      const date = (doc.data() as EntryDoc).entryDate;
-      const d = parseISODate(date);
-      const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
-      weekdayCounts[idx]! += 1;
-    }
+    entriesThisWeek += weekSnap.size;
 
     const assignmentSnap = await db
       .collection(COLLECTIONS.assignments)
@@ -1054,6 +1085,7 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
       const assignment = assignmentSnap.docs[0]!.data() as AssignmentDoc;
       const versionDoc = await db.collection(COLLECTIONS.templateVersions).doc(assignment.templateVersionId).get();
       const version = versionDoc.data() as TemplateVersionDoc;
+      if (version?.fields) reports.push(...buildFieldReports(patientEntries, version.fields));
       const allEntries = await db.collection(COLLECTIONS.entries).where('workspacePatientId', '==', p.id).get();
       const filledDates = new Set(allEntries.docs.map((e) => (e.data() as EntryDoc).entryDate));
       const adh = computeAdherence(version.periodicityType, version.periodicityConfig, assignment.startsAt, filledDates);
@@ -1062,7 +1094,13 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
     }
   }
 
-  const inactivePatients: Array<{ id: string; firstName: string; lastName: string; lastEntryAt: string | null }> = [];
+  const inactivePatients: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    lastEntryAt: string | null;
+    photoUrl?: string | null;
+  }> = [];
 
   for (const p of patients) {
     const entriesSnap = await db
@@ -1085,25 +1123,39 @@ export async function handleWorkspaceOverview(auth: AuthContext, workspaceId: st
       const assignment = assignmentSnap.docs[0]!.data() as AssignmentDoc;
       const versionDoc = await db.collection(COLLECTIONS.templateVersions).doc(assignment.templateVersionId).get();
       const version = versionDoc.data() as TemplateVersionDoc;
-      periodsWithout = version.periodicityType === 'weekly' ? 21 : version.periodicityType === 'every_n_days' ? (version.periodicityConfig.n ?? 2) * 3 : 3;
+      periodsWithout =
+        version.periodicityType === 'weekly'
+          ? 21
+          : version.periodicityType === 'every_n_days'
+            ? (version.periodicityConfig.n ?? 2) * 3
+            : 3;
     }
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - periodsWithout);
     if (!lastEntryAt || new Date(lastEntryAt) < cutoff) {
-      inactivePatients.push({ id: p.id, firstName: p.firstName, lastName: p.lastName, lastEntryAt });
+      inactivePatients.push({
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        lastEntryAt,
+        photoUrl: p.photoUrl,
+      });
     }
   }
 
   return jsonResponse(200, {
+    from,
+    to,
     activePatients: patients.length,
     entriesThisWeek,
+    entriesInRange: rangeEntries.length,
     adherencePercent:
-      totalAdherence.expected > 0
-        ? Math.round((totalAdherence.filled / totalAdherence.expected) * 100)
-        : 0,
+      totalAdherence.expected > 0 ? Math.round((totalAdherence.filled / totalAdherence.expected) * 100) : 0,
     inactivePatients: inactivePatients.slice(0, 10),
-    weekdayLoads: weekLabels.map((label, i) => ({ label, value: weekdayCounts[i] ?? 0 })),
+    weekdayLoads: weekdayCounts(rangeEntries),
+    dailyLoads: dailyCounts(rangeEntries),
+    fieldReports: mergeFieldReports(reports),
   });
 }
 
@@ -1122,6 +1174,56 @@ export async function handleListInvites(auth: AuthContext, workspaceId: string) 
   });
 
   return jsonResponse(200, { invites });
+}
+
+export async function handleEnsurePatientInvite(auth: AuthContext, workspaceId: string) {
+  const member = await assertWorkspaceStaff(auth.user, workspaceId, ['admin', 'professional']);
+  if (member.role === 'read_only') {
+    throw new ApiHttpError(403, 'FORBIDDEN', 'No podés invitar pacientes');
+  }
+  const db = getDb();
+  const snap = await db
+    .collection(COLLECTIONS.inviteLinks)
+    .where('workspaceId', '==', workspaceId)
+    .where('kind', '==', 'patient')
+    .get();
+  const active = snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as InviteLinkDoc) }))
+    .filter((i) => !i.revokedAt && i.expiresAt >= nowISO())
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
+  if (active?.token) {
+    return jsonResponse(200, { token: active.token, id: active.id });
+  }
+
+  const token = generateInviteToken();
+  if (active) {
+    await db.collection(COLLECTIONS.inviteLinks).doc(active.id).update({
+      token,
+      tokenHash: hashToken(token),
+    });
+    return jsonResponse(200, { token, id: active.id });
+  }
+
+  const inviteId = uuidv4();
+  const invite: InviteLinkDoc = {
+    workspaceId,
+    kind: 'patient',
+    role: null,
+    createdBy: auth.userId,
+    tokenHash: hashToken(token),
+    token,
+    revokedAt: null,
+    expiresAt: daysFromNow(90),
+    singleUse: false,
+    usedAt: null,
+    assignedEmail: null,
+    assignToMemberId: auth.userId,
+    seeAllPatients: false,
+    createdAt: nowISO(),
+  };
+  await db.collection(COLLECTIONS.inviteLinks).doc(inviteId).set(invite);
+  return jsonResponse(201, { token, id: inviteId });
 }
 
 export async function handleListWorkspaceMembers(auth: AuthContext, workspaceId: string) {
@@ -1167,10 +1269,77 @@ export async function handlePatchWorkspace(auth: AuthContext, workspaceId: strin
   const allowed: Partial<WorkspaceDoc> = {};
   if (body.name?.trim()) allowed.name = body.name.trim();
   if (body.imageUrl !== undefined) allowed.imageUrl = body.imageUrl;
-  if (!Object.keys(allowed).length) {
-    throw new ApiHttpError(400, 'INVALID_INPUT', 'No hay nada para guardar');
+  if (Object.keys(allowed).length) {
+    await getDb().collection(COLLECTIONS.workspaces).doc(workspaceId).update(allowed);
   }
-  await getDb().collection(COLLECTIONS.workspaces).doc(workspaceId).update(allowed);
+  return jsonResponse(200, { ok: true });
+}
+
+export async function handleGetTemplate(auth: AuthContext, templateId: string) {
+  const db = getDb();
+  const templateDoc = await db.collection(COLLECTIONS.templates).doc(templateId).get();
+  if (!templateDoc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'Plantilla no encontrada');
+  const template = templateDoc.data() as TemplateDoc;
+  await assertWorkspaceStaff(auth.user, template.workspaceId, ['admin', 'professional']);
+  const vSnap = await db
+    .collection(COLLECTIONS.templateVersions)
+    .where('templateId', '==', templateId)
+    .orderBy('version', 'desc')
+    .limit(1)
+    .get();
+  const latestVersion = vSnap.empty
+    ? null
+    : { id: vSnap.docs[0]!.id, ...(vSnap.docs[0]!.data() as TemplateVersionDoc) };
+  return jsonResponse(200, { template: { id: templateDoc.id, ...template, latestVersion } });
+}
+
+export async function handleListNotes(auth: AuthContext, patientId: string, from?: string, to?: string) {
+  const patient = await assertCanSeePatient(auth.user, patientId);
+  const snap = await getDb()
+    .collection(COLLECTIONS.professionalNotes)
+    .where('workspacePatientId', '==', patientId)
+    .get();
+  const notes = snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as ProfessionalNoteDoc) }))
+    .filter((n) => {
+      const day = n.createdAt.slice(0, 10);
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      return true;
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return jsonResponse(200, { notes, workspaceId: patient.workspaceId });
+}
+
+export async function handleCreateNote(auth: AuthContext, patientId: string, event: HandlerEvent) {
+  const patient = await assertCanEditPatient(auth.user, patientId);
+  const body = parseBody<{ body: string }>(event);
+  if (!body.body?.trim()) throw new ApiHttpError(400, 'INVALID_INPUT', 'Escribí un comentario');
+  const note: ProfessionalNoteDoc = {
+    workspaceId: patient.workspaceId,
+    workspacePatientId: patientId,
+    authorUserId: auth.userId,
+    body: body.body.trim(),
+    createdAt: nowISO(),
+  };
+  const id = uuidv4();
+  await getDb().collection(COLLECTIONS.professionalNotes).doc(id).set(note);
+  return jsonResponse(201, { note: { id, ...note } });
+}
+
+export async function handleDeleteNote(auth: AuthContext, noteId: string) {
+  const db = getDb();
+  const doc = await db.collection(COLLECTIONS.professionalNotes).doc(noteId).get();
+  if (!doc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'No encontramos el comentario');
+  const note = doc.data() as ProfessionalNoteDoc;
+  await assertCanEditPatient(auth.user, note.workspacePatientId);
+  if (note.authorUserId !== auth.userId && auth.user.platformRole !== 'global_admin') {
+    const member = await getWorkspaceMember(note.workspaceId, auth.userId);
+    if (member?.role !== 'admin') {
+      throw new ApiHttpError(403, 'FORBIDDEN', 'Solo quien lo escribió o quien administra puede borrarlo');
+    }
+  }
+  await doc.ref.delete();
   return jsonResponse(200, { ok: true });
 }
 

@@ -10,17 +10,22 @@ import {
   handleBootstrap,
   handleCreateEntry,
   handleCreateInvite,
+  handleCreateNote,
   handleCreateTemplate,
   handleCreateTemplateVersion,
   handleCreateWorkspace,
   handleDeleteEntry,
+  handleDeleteNote,
   handleDisableUser,
+  handleEnsurePatientInvite,
   handleGetInvite,
   handleGetMe,
   handleGetPatient,
+  handleGetTemplate,
   handleGetWeek,
   handleListEntries,
   handleListInvites,
+  handleListNotes,
   handleListPatients,
   handleListTemplates,
   handleListWorkspaceMembers,
@@ -60,6 +65,9 @@ async function route(event: HandlerEvent) {
   if (method === 'PATCH' && path.match(/^workspaces\/[^/]+$/)) {
     return handlePatchWorkspace(auth, path.replace('workspaces/', ''), event);
   }
+  if (method === 'POST' && path.match(/^workspaces\/[^/]+$/)) {
+    return handlePatchWorkspace(auth, path.replace('workspaces/', ''), event);
+  }
   if (method === 'POST' && path === 'uploads') return handleUpload(auth, event);
 
   if (method === 'POST' && path === 'invites/accept') return handleAcceptInvite(auth, event);
@@ -72,6 +80,10 @@ async function route(event: HandlerEvent) {
     const workspaceId = path.replace('workspaces/', '').replace('/invites', '');
     return handleListInvites(auth, workspaceId);
   }
+  if (method === 'GET' && path.match(/^workspaces\/[^/]+\/patient-invite$/)) {
+    const workspaceId = path.split('/')[1]!;
+    return handleEnsurePatientInvite(auth, workspaceId);
+  }
   if (method === 'GET' && path.startsWith('workspaces/') && path.endsWith('/members')) {
     const workspaceId = path.replace('workspaces/', '').replace('/members', '');
     return handleListWorkspaceMembers(auth, workspaceId);
@@ -82,7 +94,12 @@ async function route(event: HandlerEvent) {
   }
   if (method === 'GET' && path.startsWith('workspaces/') && path.endsWith('/overview')) {
     const workspaceId = path.replace('workspaces/', '').replace('/overview', '');
-    return handleWorkspaceOverview(auth, workspaceId);
+    return handleWorkspaceOverview(
+      auth,
+      workspaceId,
+      event.queryStringParameters?.from,
+      event.queryStringParameters?.to,
+    );
   }
 
   if (method === 'GET' && path.startsWith('workspaces/') && path.endsWith('/patients')) {
@@ -96,9 +113,20 @@ async function route(event: HandlerEvent) {
     const from = event.queryStringParameters?.from;
     return handleGetWeek(auth, patientId, from);
   }
+  if (method === 'GET' && path.match(/^patients\/[^/]+\/notes$/)) {
+    const patientId = path.split('/')[1]!;
+    return handleListNotes(auth, patientId, event.queryStringParameters?.from, event.queryStringParameters?.to);
+  }
+  if (method === 'POST' && path.match(/^patients\/[^/]+\/notes$/)) {
+    const patientId = path.split('/')[1]!;
+    return handleCreateNote(auth, patientId, event);
+  }
+  if (method === 'DELETE' && path.match(/^notes\/[^/]+$/)) {
+    return handleDeleteNote(auth, path.replace('notes/', ''));
+  }
   if (method === 'GET' && path.startsWith('patients/') && path.endsWith('/entries')) {
     const patientId = path.replace('patients/', '').replace('/entries', '');
-    return handleListEntries(auth, patientId);
+    return handleListEntries(auth, patientId, event.queryStringParameters?.from, event.queryStringParameters?.to);
   }
   if (method === 'GET' && path.startsWith('patients/')) {
     const patientId = path.replace('patients/', '');
@@ -122,6 +150,9 @@ async function route(event: HandlerEvent) {
     return handleListTemplates(auth, workspaceId);
   }
   if (method === 'POST' && path === 'templates') return handleCreateTemplate(auth, event);
+  if (method === 'GET' && path.match(/^templates\/[^/]+$/)) {
+    return handleGetTemplate(auth, path.replace('templates/', ''));
+  }
   if (method === 'PATCH' && path.match(/^templates\/[^/]+$/)) {
     return handlePatchTemplate(auth, path.replace('templates/', ''), event);
   }
@@ -133,7 +164,12 @@ async function route(event: HandlerEvent) {
   if (method === 'GET' && path === 'entries') {
     const patientId = event.queryStringParameters?.workspacePatientId;
     if (!patientId) throw new Error('workspacePatientId requerido');
-    return handleListEntries(auth, patientId);
+    return handleListEntries(
+      auth,
+      patientId,
+      event.queryStringParameters?.from,
+      event.queryStringParameters?.to,
+    );
   }
   if (method === 'POST' && path === 'entries') return handleCreateEntry(auth, event);
   if (method === 'PATCH' && path.startsWith('entries/')) {

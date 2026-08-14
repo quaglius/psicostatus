@@ -10,10 +10,10 @@ interface ProLayoutProps {
 }
 
 const NAV = [
+  { to: '/pro/espacio', label: 'Espacio', help: 'El tablero de tu consultorio' },
   { to: '/pro/pacientes', label: 'Pacientes', help: 'Quiénes están a tu cargo' },
   { to: '/pro/plantillas', label: 'Plantillas', help: 'Qué les pedís cargar' },
   { to: '/pro/equipo', label: 'Equipo', help: 'Quién trabaja acá' },
-  { to: '/pro/espacio', label: 'Espacio', help: 'El tablero de tu consultorio' },
 ];
 
 export function ProLayout({ children, workspaceName }: ProLayoutProps) {
@@ -52,7 +52,7 @@ export function ProLayout({ children, workspaceName }: ProLayoutProps) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-[1080px] px-4 py-8">{children}</main>
+      <main className="anim-in mx-auto max-w-[1080px] px-4 py-8">{children}</main>
     </div>
   );
 }

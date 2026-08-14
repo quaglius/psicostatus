@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PeriodicityType, WeekDayInfo } from '@shared/types';
 import { formatDateAR, parseISODate } from '@shared/periodicity';
 
@@ -87,18 +87,32 @@ export function WeekNav({
 }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-2">
-      <button type="button" className="text-sm text-[var(--sage)]" onClick={onPrev}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-[var(--sage)] transition-transform duration-150 hover:bg-[var(--sage-soft)] active:scale-95"
+        onClick={onPrev}
+      >
+        <ChevronLeft size={18} />
         Semana anterior
       </button>
       {!isCurrentWeek ? (
-        <button type="button" className="text-sm text-[var(--clay)]" onClick={onToday}>
+        <button
+          type="button"
+          className="text-sm text-[var(--clay)] transition-transform duration-150 active:scale-95"
+          onClick={onToday}
+        >
           Ir a hoy
         </button>
       ) : (
         <span className="text-sm text-[var(--ink-soft)]">Esta semana</span>
       )}
-      <button type="button" className="text-sm text-[var(--sage)]" onClick={onNext}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-[var(--sage)] transition-transform duration-150 hover:bg-[var(--sage-soft)] active:scale-95"
+        onClick={onNext}
+      >
         Semana siguiente
+        <ChevronRight size={18} />
       </button>
     </div>
   );

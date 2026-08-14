@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus } from 'lucide-react';
+import { Copy, UserPlus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/avatar';
+import { PageSkeleton } from '@/components/skeleton';
+import { ListToolbar, Pagination, SortHeader, usePagedSort, type SortDir } from '@/components/paged-list';
 import { adherenceCopy } from '@/lib/labels';
 
 interface PatientRow {
@@ -26,6 +28,9 @@ export function PatientsPage() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   useEffect(() => {
     if (me && !workspace && me.patientMemberships.length === 0 && me.user.platformRole !== 'global_admin') {
@@ -35,8 +40,12 @@ export function PatientsPage() {
 
   const load = async () => {
     if (!workspace) return;
-    const res = await apiFetch<{ patients: PatientRow[] }>(`workspaces/${workspace.workspace.id}/patients`);
+    const [res, invite] = await Promise.all([
+      apiFetch<{ patients: PatientRow[] }>(`workspaces/${workspace.workspace.id}/patients`),
+      apiFetch<{ token: string }>(`workspaces/${workspace.workspace.id}/patient-invite`),
+    ]);
     setPatients(res.patients);
+    setInviteUrl(`${window.location.origin}/i/${invite.token}`);
     setLoading(false);
   };
 
@@ -45,20 +54,31 @@ export function PatientsPage() {
   }, [workspace?.workspace.id]);
 
   const copyLink = async () => {
-    if (!workspace) return;
-    const res = await apiFetch<{ token: string }>('invites', {
-      method: 'POST',
-      body: JSON.stringify({ workspaceId: workspace.workspace.id, kind: 'patient' }),
-    });
-    const url = `${window.location.origin}/i/${res.token}`;
-    await navigator.clipboard.writeText(url);
+    if (!inviteUrl) return;
+    await navigator.clipboard.writeText(inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const filtered = patients.filter((p) =>
-    `${p.firstName} ${p.lastName}`.toLowerCase().includes(search.toLowerCase()),
-  );
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(key);
+      setSortDir(key === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  const { pageItems, page, setPage, pageCount, total } = usePagedSort(patients, {
+    search,
+    match: (p, q) => `${p.firstName} ${p.lastName}`.toLowerCase().includes(q),
+    sortKey,
+    sortDir,
+    value: (p, key) => {
+      if (key === 'last') return p.lastEntryAt ?? '';
+      if (key === 'adherence') return p.adherence.expected ? p.adherence.filled / p.adherence.expected : 0;
+      return `${p.lastName} ${p.firstName}`.toLowerCase();
+    },
+  });
 
   if (!workspace) {
     return (
@@ -79,57 +99,74 @@ export function PatientsPage() {
             Acá están las personas que invitaste. El texto a la derecha dice cuántos días cargaron de los que se esperaban esta semana.
           </p>
         </div>
-        <Button onClick={copyLink}>
+        <Button onClick={() => void copyLink()} disabled={!inviteUrl}>
           <UserPlus size={18} />
-          {copied ? 'Link copiado' : 'Invitar pacientes'}
+          {copied ? 'Link copiado' : 'Copiar link'}
         </Button>
       </div>
 
-      {patients.length > 3 ? (
-        <input
-          className="mb-4 w-full rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-4 py-2"
-          placeholder="Buscar por nombre..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Buscar pacientes"
-        />
-      ) : null}
+      <Card className="mb-8 space-y-3">
+        <p className="font-display text-lg">Link de invitación</p>
+        <p className="text-sm text-[var(--ink-soft)]">
+          Mandáselo por WhatsApp o mail. Si es alguien nuevo, se registra y empieza a cargar. Si ya tiene cuenta, el sistema lo reconoce y no le pide registrarse otra vez. Si lo abrís vos, te lleva a tu espacio.
+        </p>
+        {inviteUrl ? (
+          <p className="break-all rounded-[var(--radius-input)] bg-[var(--empty)] px-3 py-2 text-sm">{inviteUrl}</p>
+        ) : (
+          <p className="text-sm text-[var(--ink-soft)]">Preparando el link…</p>
+        )}
+        <Button variant="secondary" onClick={() => void copyLink()} disabled={!inviteUrl}>
+          <Copy size={16} />
+          {copied ? 'Copiado' : 'Copiar'}
+        </Button>
+      </Card>
 
       {loading ? (
-        <p className="text-[var(--ink-soft)]">Cargando...</p>
-      ) : filtered.length === 0 ? (
+        <PageSkeleton />
+      ) : patients.length === 0 ? (
         <Card className="text-center">
           <p className="mb-2 font-display text-xl">Todavía no hay nadie</p>
-          <p className="mb-4 text-[var(--ink-soft)]">
-            Copiá el link y mandáselo por WhatsApp o mail. Cuando la persona cree su cuenta, aparece acá.
-          </p>
-          <Button onClick={copyLink}>Copiar link de invitación</Button>
+          <p className="text-[var(--ink-soft)]">Cuando acepten el link, aparecen acá.</p>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => (
-            <Link key={p.id} to={`/pro/pacientes/${p.id}`} className="block hover:no-underline">
-              <Card className="flex items-center justify-between gap-3 transition-colors hover:border-[var(--sage)]">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Avatar name={`${p.firstName} ${p.lastName}`} src={p.photoUrl} />
-                  <div className="min-w-0">
-                    <p className="font-medium">
-                      {p.firstName} {p.lastName}
-                    </p>
-                    <p className="text-sm text-[var(--ink-soft)]">
-                      {p.lastEntryAt
-                        ? `Última carga: ${new Date(p.lastEntryAt).toLocaleDateString('es-AR')}`
-                        : 'Todavía no cargó nada'}
-                    </p>
+        <>
+          <ListToolbar search={search} onSearch={setSearch} placeholder="Buscar por nombre..." />
+          <SortHeader
+            columns={[
+              { key: 'name', label: 'Nombre' },
+              { key: 'last', label: 'Última carga' },
+              { key: 'adherence', label: 'Adherencia' },
+            ]}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+          <div className="space-y-2">
+            {pageItems.map((p) => (
+              <Link key={p.id} to={`/pro/pacientes/${p.id}`} className="block hover:no-underline">
+                <Card className="flex items-center justify-between gap-3 transition-colors hover:border-[var(--sage)]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={`${p.firstName} ${p.lastName}`} src={p.photoUrl} />
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        {p.firstName} {p.lastName}
+                      </p>
+                      <p className="text-sm text-[var(--ink-soft)]">
+                        {p.lastEntryAt
+                          ? `Última carga: ${new Date(p.lastEntryAt).toLocaleDateString('es-AR')}`
+                          : 'Todavía no cargó nada'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <span className="shrink-0 text-right text-sm text-[var(--sage)]">
-                  {adherenceCopy(p.adherence.filled, p.adherence.expected)}
-                </span>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                  <span className="shrink-0 text-right text-sm text-[var(--sage)]">
+                    {adherenceCopy(p.adherence.filled, p.adherence.expected)}
+                  </span>
+                </Card>
+              </Link>
+            ))}
+          </div>
+          <Pagination page={page} pageCount={pageCount} total={total} onPage={setPage} />
+        </>
       )}
     </ProLayout>
   );

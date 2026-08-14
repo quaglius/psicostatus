@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { APP_NAME } from '@/lib/labels';
+import { Avatar } from '@/components/avatar';
 
 interface PatientLayoutProps {
   children: ReactNode;
   workspaceName?: string;
+  workspaceImageUrl?: string | null;
   workspaces?: Array<{ id: string; name: string }>;
   activeWorkspaceId?: string;
   onWorkspaceChange?: (id: string) => void;
@@ -13,6 +15,7 @@ interface PatientLayoutProps {
 export function PatientLayout({
   children,
   workspaceName,
+  workspaceImageUrl,
   workspaces,
   activeWorkspaceId,
   onWorkspaceChange,
@@ -46,7 +49,10 @@ export function PatientLayout({
             </select>
           </div>
         ) : workspaceName ? (
-          <p className="mb-2 text-sm text-[var(--ink-soft)]">{workspaceName}</p>
+          <div className="mb-3 flex items-center gap-3">
+            <Avatar name={workspaceName} src={workspaceImageUrl} size={40} />
+            <p className="text-sm text-[var(--ink-soft)]">{workspaceName}</p>
+          </div>
         ) : (
           <Link to="/" className="mb-2 inline-block text-sm text-[var(--ink-soft)]">
             {APP_NAME}
@@ -61,7 +67,7 @@ export function PatientLayout({
                 key={tab.to}
                 to={tab.to}
                 className={[
-                  'flex-1 rounded-full py-2 text-center text-sm transition-colors',
+                  'flex-1 rounded-full py-2 text-center text-sm transition-colors hover:no-underline',
                   active ? 'bg-[var(--surface)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-soft)]',
                 ].join(' ')}
               >
@@ -71,7 +77,7 @@ export function PatientLayout({
           })}
         </nav>
 
-        {children}
+        <div className="anim-in">{children}</div>
       </div>
     </div>
   );
