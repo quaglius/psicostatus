@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
 import { WeekNav, WeekStrip } from '@/components/week-strip';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Sheet } from '@/components/ui/Sheet';
 import { Avatar } from '@/components/avatar';
 import { EntryReadout } from '@/components/entry-readout';
 import { AdherenceRing } from '@/components/charts';
@@ -59,6 +60,7 @@ export function PatientDetailPage() {
   const [week, setWeek] = useState<{ days: WeekDayInfo[]; periodicityType: PeriodicityType } | null>(null);
   const [entries, setEntries] = useState<Array<EntryDoc & { id: string }>>([]);
   const [templateVersion, setTemplateVersion] = useState<(TemplateVersionDoc & { id: string }) | null>(null);
+  const [templateName, setTemplateName] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Array<TemplateDoc & { id: string; latestVersion?: TemplateVersionDoc & { id: string } }>>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [careTeam, setCareTeam] = useState<Array<{ id: string; memberUserId: string; canEdit: boolean }>>([]);
@@ -75,6 +77,8 @@ export function PatientDetailPage() {
   const [noteSearch, setNoteSearch] = useState('');
   const [noteSort] = useState('date');
   const [noteDir, setNoteDir] = useState<SortDir>('desc');
+  const [assigning, setAssigning] = useState(false);
+  const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
 
   const weekFrom = searchParams.get('semana') ?? '';
   const selectedDate = searchParams.get('dia') || todayInAR();
@@ -93,7 +97,9 @@ export function PatientDetailPage() {
     const [detail, weekRes, entriesRes, notesRes] = await Promise.all([
       apiFetch<{
         patient: { firstName: string; lastName: string; id: string; workspaceId: string; photoUrl?: string | null; archivedAt?: string | null };
+        assignment?: { templateId: string } | null;
         templateVersion: TemplateVersionDoc & { id: string };
+        templateName?: string | null;
         careTeam: Array<{ id: string; memberUserId: string; canEdit: boolean }>;
       }>(`patients/${id}`),
       apiFetch<{ days: WeekDayInfo[]; periodicityType: PeriodicityType }>(
@@ -104,6 +110,8 @@ export function PatientDetailPage() {
     ]);
     setPatient(detail.patient);
     setTemplateVersion(detail.templateVersion);
+    setTemplateName(detail.templateName ?? null);
+    setSelectedTemplate(detail.assignment?.templateId ?? '');
     setCareTeam(detail.careTeam);
     setWeek(weekRes);
     setEntries(entriesRes.entries);
@@ -132,11 +140,27 @@ export function PatientDetailPage() {
 
   const assignTemplate = async () => {
     if (!id || !selectedTemplate) return;
-    await apiFetch(`patients/${id}/template`, {
-      method: 'POST',
-      body: JSON.stringify({ templateId: selectedTemplate }),
-    });
-    await load();
+    setAssigning(true);
+    try {
+      const res = await apiFetch<{ unchanged: boolean; templateName: string }>(`patients/${id}/template`, {
+        method: 'POST',
+        body: JSON.stringify({ templateId: selectedTemplate }),
+      });
+      await load();
+      setNotice({
+        title: res.unchanged ? 'Sin cambios' : 'Cuestionario actualizado',
+        body: res.unchanged
+          ? `Esta persona ya usaba «${res.templateName}».`
+          : `A partir de hoy usa «${res.templateName}». Lo ya cargado se conserva. Si querés otra plantilla, elegila de nuevo acá.`,
+      });
+    } catch (err) {
+      setNotice({
+        title: 'No se pudo cambiar',
+        body: err instanceof ApiClientError ? err.message : 'Algo falló. Probá de nuevo.',
+      });
+    } finally {
+      setAssigning(false);
+    }
   };
 
   const addToCareTeam = async () => {
@@ -182,6 +206,8 @@ export function PatientDetailPage() {
   };
 
   const isAdmin = workspace?.role === 'admin' || me?.user.platformRole === 'global_admin';
+  const canChangeTemplate =
+    isAdmin || workspace?.role === 'professional';
   const fields = templateVersion?.fields as FieldDefinition[] | undefined;
   const last = entries[0];
   const filledDates = new Set(entries.map((e) => e.entryDate));
@@ -351,7 +377,7 @@ export function PatientDetailPage() {
             )}
           </div>
 
-          {isAdmin ? (
+          {canChangeTemplate ? (
             <Card className="mb-8 space-y-3" data-tour="patient-template">
               <h2 className="font-display text-lg">Cambiar el cuestionario</h2>
               <p className="text-sm text-[var(--ink-soft)]">Lo ya cargado se conserva. A partir de hoy usa la plantilla nueva. Si no elegís nada, los nuevos usan la plantilla marcada por defecto en Plantillas.</p>
@@ -367,14 +393,16 @@ export function PatientDetailPage() {
                   </option>
                 ))}
               </select>
-              <Button onClick={assignTemplate} disabled={!selectedTemplate}>
-                Usar esta plantilla
+              <Button type="button" onClick={() => void assignTemplate()} disabled={!selectedTemplate || assigning}>
+                {assigning ? 'Guardando…' : 'Usar esta plantilla'}
               </Button>
               {templateVersion ? (
                 <p className="text-sm text-[var(--ink-soft)]">
-                  Activo: {PERIODICITY[templateVersion.periodicityType].label}
+                  Ahora usa: {templateName ?? 'plantilla actual'} · {PERIODICITY[templateVersion.periodicityType].label}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-sm text-[var(--ink-soft)]">Todavía no tiene cuestionario asignado.</p>
+              )}
             </Card>
           ) : null}
         </>
@@ -524,6 +552,10 @@ export function PatientDetailPage() {
           </Button>
         </Card>
       ) : null}
+
+      <Sheet open={!!notice} title={notice?.title ?? ''} onClose={() => setNotice(null)}>
+        <p>{notice?.body}</p>
+      </Sheet>
     </ProLayout>
   );
 }

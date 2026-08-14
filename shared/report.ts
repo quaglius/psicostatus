@@ -40,14 +40,18 @@ export function weekdayCounts(entries: EntryDoc[]): ReportSlice[] {
 export function buildFieldReports(entries: EntryDoc[], fields: FieldDefinition[]): FieldReport[] {
   const sorted = [...fields].sort((a, b) => a.order - b.order);
   return sorted
-    .filter((f) => f.type === 'faces' || f.type === 'scale' || f.type === 'number' || f.type === 'select')
+    .filter((f) => f.type === 'faces' || f.type === 'scale' || f.type === 'number' || f.type === 'select' || f.type === 'yes_no')
     .map((field) => {
       const slicesMap = new Map<string, number>();
       const series: Array<{ date: string; value: number }> = [];
       for (const e of [...entries].sort((a, b) => a.entryDate.localeCompare(b.entryDate))) {
         const raw = e.values[field.id];
         if (raw === undefined || raw === null || raw === '') continue;
-        if (field.type === 'faces' || field.type === 'select') {
+        if (field.type === 'yes_no') {
+          const yes = raw === true || raw === 'true' || raw === 'Sí';
+          const key = yes ? 'Sí' : 'No';
+          slicesMap.set(key, (slicesMap.get(key) ?? 0) + 1);
+        } else if (field.type === 'faces' || field.type === 'select') {
           const key = field.type === 'faces' ? (FACE_ES[String(raw)] ?? String(raw)) : String(raw);
           slicesMap.set(key, (slicesMap.get(key) ?? 0) + 1);
         } else {

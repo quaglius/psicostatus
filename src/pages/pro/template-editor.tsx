@@ -242,25 +242,38 @@ export function TemplateEditorPage() {
                   {f.type === 'select' ? (
                     <Input
                       label="Opciones (separadas por coma)"
-                      value={((f.config.options as string[]) ?? []).join(', ')}
-                      onChange={(e) =>
+                      value={
+                        typeof f.config.optionsText === 'string'
+                          ? f.config.optionsText
+                          : ((f.config.options as string[]) ?? []).join(', ')
+                      }
+                      onChange={(e) => {
+                        const optionsText = e.target.value;
                         updateField(i, {
                           config: {
                             ...f.config,
-                            options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                            optionsText,
+                            options: optionsText
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter(Boolean),
                           },
-                        })
-                      }
+                        });
+                      }}
                     />
                   ) : null}
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={f.required}
-                      onChange={(e) => updateField(i, { required: e.target.checked })}
-                    />
-                    Obligatorio (no puede saltearlo)
-                  </label>
+                  {f.type === 'yes_no' ? (
+                    <p className="text-sm text-[var(--ink-soft)]">El paciente ve un tilde: marcado es sí, vacío es no.</p>
+                  ) : (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={f.required}
+                        onChange={(e) => updateField(i, { required: e.target.checked })}
+                      />
+                      Obligatorio (no puede saltearlo)
+                    </label>
+                  )}
                 </div>
                 <button
                   type="button"

@@ -81,6 +81,10 @@ export const FIELD_TYPE: Record<FieldType, { label: string; help: string }> = {
     label: 'Lista para elegir',
     help: 'Elige una opción de una lista que vos armás.',
   },
+  yes_no: {
+    label: 'Sí / No',
+    help: 'Un tilde. Marcado es sí, vacío es no.',
+  },
 };
 
 export const PERIODICITY: Record<PeriodicityType, { label: string; help: string }> = {

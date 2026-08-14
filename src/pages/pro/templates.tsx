@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { ClipboardList, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProLayout } from '@/components/layout/ProLayout';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Sheet } from '@/components/ui/Sheet';
 import { PageSkeleton } from '@/components/skeleton';
 import { PeriodicityIcon } from '@/lib/field-icons';
 import { PERIODICITY } from '@/lib/labels';
@@ -23,6 +24,8 @@ export function TemplatesPage() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
 
   const load = () => {
     if (!workspace) return;
@@ -36,8 +39,35 @@ export function TemplatesPage() {
   }, [workspace?.workspace.id]);
 
   const setDefault = async (id: string) => {
-    await apiFetch(`templates/${id}/default`, { method: 'POST', body: '{}' });
-    load();
+    setBusyId(id);
+    try {
+      const res = await apiFetch<{ name: string; assignedCount: number; skippedCount: number }>(
+        `templates/${id}/default`,
+        { method: 'POST', body: '{}' },
+      );
+      load();
+      const assigned =
+        res.assignedCount === 1
+          ? `Se asignó «${res.name}» a 1 persona activa.`
+          : `Se asignó «${res.name}» a ${res.assignedCount} personas activas.`;
+      const skipped =
+        res.skippedCount === 0
+          ? ''
+          : res.skippedCount === 1
+            ? ' 1 ya la tenía.'
+            : ` ${res.skippedCount} ya la tenían.`;
+      setNotice({
+        title: 'Plantilla por defecto',
+        body: `${assigned}${skipped} Lo ya cargado se conserva. A partir de hoy usan esta plantilla. Si querés otra en alguien, entrá a su ficha y cambiá el cuestionario.`,
+      });
+    } catch (err) {
+      setNotice({
+        title: 'No se pudo cambiar',
+        body: err instanceof ApiClientError ? err.message : 'Algo falló. Probá de nuevo.',
+      });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -66,7 +96,7 @@ export function TemplatesPage() {
       </div>
 
       <p className="mb-4 max-w-2xl text-sm text-[var(--ink-soft)]" data-tour="templates-default">
-        “Usar por defecto” hace que los pacientes nuevos reciban esa plantilla. Después podés cambiarla persona por persona en su ficha.
+        “Usar por defecto” asigna esa plantilla a todas las personas activas y la dejan recibiendo los pacientes nuevos. Después podés cambiarla persona por persona en su ficha.
       </p>
       <p className="mb-6 max-w-2xl text-sm text-[var(--ink-soft)]" data-tour="templates-per-patient">
         En la ficha de cada paciente, en “Cambiar el cuestionario”, elegís qué formulario usa esa persona.
@@ -99,9 +129,13 @@ export function TemplatesPage() {
             sortKey={sortKey}
             sortDir={sortDir}
             onSetDefault={setDefault}
+            busyId={busyId}
           />
         </>
       )}
+      <Sheet open={!!notice} title={notice?.title ?? ''} onClose={() => setNotice(null)}>
+        <p>{notice?.body}</p>
+      </Sheet>
     </ProLayout>
   );
 }
@@ -112,12 +146,14 @@ function TemplatePagedList({
   sortKey,
   sortDir,
   onSetDefault,
+  busyId,
 }: {
   templates: TemplateRow[];
   search: string;
   sortKey: string;
   sortDir: SortDir;
   onSetDefault: (id: string) => void;
+  busyId: string | null;
 }) {
   const { pageItems, page, setPage, pageCount, total } = usePagedSort(templates, {
     search,
@@ -140,7 +176,7 @@ function TemplatePagedList({
               <ClipboardList className="mt-1 text-[var(--sage)]" size={22} />
               <div>
                 <p className="font-medium">{t.name}</p>
-                {t.isDefault ? <p className="text-xs text-[var(--sage)]">La que reciben los pacientes nuevos</p> : null}
+                {t.isDefault ? <p className="text-xs text-[var(--sage)]">Por defecto: activas y pacientes nuevos</p> : null}
                 {t.latestVersion ? (
                   <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--ink-soft)]">
                     <PeriodicityIcon type={t.latestVersion.periodicityType} size={16} />
@@ -153,8 +189,8 @@ function TemplatePagedList({
               {t.isDefault ? (
                 <span className="text-sm text-[var(--sage)]">Por defecto</span>
               ) : (
-                <Button variant="secondary" onClick={() => onSetDefault(t.id)}>
-                  Usar por defecto
+                <Button variant="secondary" type="button" disabled={busyId === t.id} onClick={() => onSetDefault(t.id)}>
+                  {busyId === t.id ? 'Asignando…' : 'Usar por defecto'}
                 </Button>
               )}
               <Link to={`/pro/plantillas/${t.id}`} className="text-sm text-[var(--sage)] hover:no-underline">

@@ -21,7 +21,7 @@ export function FieldReports({ reports }: { reports: FieldReport[] }) {
             <FieldTypeIcon type={r.fieldType as FieldType} />
             {r.fieldLabel}
           </p>
-          {r.fieldType === 'faces' || r.fieldType === 'select' ? (
+          {r.fieldType === 'faces' || r.fieldType === 'select' || r.fieldType === 'yes_no' ? (
             <PieChart
               title="Cómo se distribuyen las respuestas"
               help="Cada porción es una opción. Sirve para ver qué predomina."

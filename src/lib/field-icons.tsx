@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CalendarClock,
   CalendarDays,
+  CheckSquare,
   Clock,
   Gauge,
   Hash,
@@ -26,6 +27,7 @@ export const FIELD_ICONS: Record<FieldType, LucideIcon> = {
   datetime: CalendarClock,
   number: Hash,
   select: List,
+  yes_no: CheckSquare,
 };
 
 export const PERIODICITY_ICONS: Record<PeriodicityType, LucideIcon> = {

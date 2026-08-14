@@ -58,7 +58,7 @@ export const TEMPLATES_TOUR_STEPS: TourStep[] = [
     path: '/pro/plantillas',
     selector: '[data-tour="templates-default"]',
     title: 'Plantilla por defecto',
-    body: 'Con “Usar por defecto”, los pacientes nuevos reciben esa plantilla al aceptar el link.',
+    body: 'Con “Usar por defecto” se asigna a todas las personas activas y también la reciben los pacientes nuevos. Si alguien necesita otra, se cambia en su ficha.',
   },
   {
     path: '/pro/plantillas',

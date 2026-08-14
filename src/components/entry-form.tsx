@@ -95,6 +95,20 @@ export function EntryForm({ fields, values, onChange, errors = {} }: EntryFormPr
             </select>
           ) : null}
 
+          {field.type === 'yes_no' ? (
+            <label className="flex cursor-pointer items-center gap-3 rounded-[var(--radius-input)] border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
+              <input
+                type="checkbox"
+                className="h-6 w-6 accent-[var(--sage)]"
+                checked={values[field.id] === true || values[field.id] === 'true' || values[field.id] === 'Sí'}
+                onChange={(e) => setValue(field.id, e.target.checked)}
+              />
+              <span className="text-lg">
+                {values[field.id] === true || values[field.id] === 'true' || values[field.id] === 'Sí' ? 'Sí' : 'No'}
+              </span>
+            </label>
+          ) : null}
+
           {errors[field.id] ? (
             <p className="text-sm text-[var(--danger)]">{errors[field.id]}</p>
           ) : null}
@@ -112,6 +126,7 @@ export function useEntryFormState(fields: FieldDefinition[]) {
     const next: Record<string, string> = {};
     for (const field of fields) {
       const v = values[field.id];
+      if (field.type === 'yes_no') continue;
       if (field.required && (v === undefined || v === null || v === '')) {
         next[field.id] = 'Este campo es obligatorio';
       }

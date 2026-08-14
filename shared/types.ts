@@ -13,7 +13,8 @@ export type FieldType =
   | 'scale'
   | 'number'
   | 'select'
-  | 'faces';
+  | 'faces'
+  | 'yes_no';
 
 export interface FieldDefinition {
   id: string;

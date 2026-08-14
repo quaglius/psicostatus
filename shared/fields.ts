@@ -15,6 +15,7 @@ export const fieldDefinitionSchema = z.object({
     'number',
     'select',
     'faces',
+    'yes_no',
   ] as const),
   label: z.string().min(1),
   required: z.boolean(),
@@ -62,8 +63,12 @@ export function validateEntryValues(
   const result: Record<string, unknown> = {};
   for (const field of fields) {
     const value = values[field.id];
-    if (field.required && (value === undefined || value === null || value === '')) {
+    if (field.required && field.type !== 'yes_no' && (value === undefined || value === null || value === '')) {
       throw new Error(`El campo "${field.label}" es obligatorio`);
+    }
+    if (field.type === 'yes_no') {
+      result[field.id] = value === true || value === 'true' || value === 'Sí';
+      continue;
     }
     if (value === undefined || value === null || value === '') {
       continue;

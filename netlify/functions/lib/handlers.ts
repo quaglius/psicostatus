@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import type { DocumentReference } from 'firebase-admin/firestore';
 import type { HandlerEvent } from '@netlify/functions';
 import { DEFAULT_TEMPLATE_FIELDS } from '../../../shared/fields';
 import type {
@@ -28,7 +29,7 @@ import {
   startOfWeekMonday,
   addDays,
 } from '../../../shared/periodicity';
-import { daysFromNow, generateInviteToken, hashToken, nowISO, todayISO, yesterdayISO } from '../../../shared/utils';
+import { daysFromNow, generateInviteToken, hashToken, nowISO, todayISO } from '../../../shared/utils';
 import { validateEntryValues, validateFieldDefinitions } from '../../../shared/fields';
 import {
   assertCanEditPatient,
@@ -40,6 +41,21 @@ import {
 } from './access';
 import { COLLECTIONS, getAdminAuth, getBucket, getDb } from './firebase';
 import { ApiHttpError, type AuthContext, jsonResponse, parseBody, verifyBearer } from './http';
+
+function yesterdayInAR(): string {
+  return formatDateISO(addDays(parseISODate(todayInAR()), -1));
+}
+
+async function latestTemplateVersionId(db: ReturnType<typeof getDb>, templateId: string): Promise<string> {
+  const vSnap = await db
+    .collection(COLLECTIONS.templateVersions)
+    .where('templateId', '==', templateId)
+    .orderBy('version', 'desc')
+    .limit(1)
+    .get();
+  if (vSnap.empty) throw new ApiHttpError(404, 'NO_VERSION', 'La plantilla no tiene versiones');
+  return vSnap.docs[0]!.id;
+}
 
 async function buildMeResponse(userId: string): Promise<MeResponse> {
   const db = getDb();
@@ -554,17 +570,20 @@ export async function handleGetPatient(auth: AuthContext, patientId: string) {
 
   let assignment = null;
   let templateVersion = null;
+  let templateName: string | null = null;
   if (!assignmentSnap.empty) {
     const aDoc = assignmentSnap.docs[0]!;
     assignment = { id: aDoc.id, ...(aDoc.data() as AssignmentDoc) };
     const vDoc = await db.collection(COLLECTIONS.templateVersions).doc(assignment.templateVersionId).get();
     templateVersion = { id: vDoc.id, ...(vDoc.data() as TemplateVersionDoc) };
+    const tDoc = await db.collection(COLLECTIONS.templates).doc(assignment.templateId).get();
+    templateName = tDoc.exists ? (tDoc.data() as TemplateDoc).name : null;
   }
 
   const careSnap = await db.collection(COLLECTIONS.careTeam).where('workspacePatientId', '==', patientId).get();
   const careTeam = careSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  return jsonResponse(200, { patient, assignment, templateVersion, careTeam });
+  return jsonResponse(200, { patient, assignment, templateVersion, templateName, careTeam });
 }
 
 export async function handlePatchPatient(auth: AuthContext, patientId: string, event: HandlerEvent) {
@@ -585,7 +604,7 @@ export async function handlePatchPatient(auth: AuthContext, patientId: string, e
 }
 
 export async function handleAssignTemplate(auth: AuthContext, patientId: string, event: HandlerEvent) {
-  await assertCanEditPatient(auth.user, patientId);
+  const patient = await assertCanEditPatient(auth.user, patientId);
   const body = parseBody<{ templateId: string; templateVersionId?: string }>(event);
   const db = getDb();
 
@@ -593,18 +612,12 @@ export async function handleAssignTemplate(auth: AuthContext, patientId: string,
   if (!templateDoc.exists) {
     throw new ApiHttpError(404, 'NOT_FOUND', 'Plantilla no encontrada');
   }
-
-  let versionId = body.templateVersionId;
-  if (!versionId) {
-    const vSnap = await db
-      .collection(COLLECTIONS.templateVersions)
-      .where('templateId', '==', body.templateId)
-      .orderBy('version', 'desc')
-      .limit(1)
-      .get();
-    if (vSnap.empty) throw new ApiHttpError(404, 'NO_VERSION', 'La plantilla no tiene versiones');
-    versionId = vSnap.docs[0]!.id;
+  const template = templateDoc.data() as TemplateDoc;
+  if (template.workspaceId !== patient.workspaceId) {
+    throw new ApiHttpError(403, 'FORBIDDEN', 'Esa plantilla no es de este espacio');
   }
+
+  const versionId = body.templateVersionId ?? (await latestTemplateVersionId(db, body.templateId));
 
   const openSnap = await db
     .collection(COLLECTIONS.assignments)
@@ -612,9 +625,14 @@ export async function handleAssignTemplate(auth: AuthContext, patientId: string,
     .where('endsAt', '==', null)
     .get();
 
+  const current = openSnap.docs[0]?.data() as AssignmentDoc | undefined;
+  if (current?.templateId === body.templateId && current?.templateVersionId === versionId) {
+    return jsonResponse(200, { unchanged: true, templateName: template.name });
+  }
+
   const batch = db.batch();
   for (const d of openSnap.docs) {
-    batch.update(d.ref, { endsAt: yesterdayISO() });
+    batch.update(d.ref, { endsAt: yesterdayInAR() });
   }
 
   const newId = uuidv4();
@@ -622,14 +640,14 @@ export async function handleAssignTemplate(auth: AuthContext, patientId: string,
     workspacePatientId: patientId,
     templateId: body.templateId,
     templateVersionId: versionId,
-    startsAt: todayISO(),
+    startsAt: todayInAR(),
     endsAt: null,
     createdAt: nowISO(),
   };
   batch.set(db.collection(COLLECTIONS.assignments).doc(newId), assignment);
   await batch.commit();
 
-  return jsonResponse(200, { assignmentId: newId });
+  return jsonResponse(200, { assignmentId: newId, unchanged: false, templateName: template.name });
 }
 
 export async function handleAddCareTeam(auth: AuthContext, patientId: string, event: HandlerEvent) {
@@ -1362,12 +1380,71 @@ export async function handleSetDefaultTemplate(auth: AuthContext, templateId: st
   const template = templateDoc.data() as TemplateDoc;
   await assertWorkspaceStaff(auth.user, template.workspaceId, ['admin', 'professional']);
   const snap = await db.collection(COLLECTIONS.templates).where('workspaceId', '==', template.workspaceId).get();
-  const batch = db.batch();
+  const flagBatch = db.batch();
   for (const d of snap.docs) {
-    batch.update(d.ref, { isDefault: d.id === templateId });
+    flagBatch.update(d.ref, { isDefault: d.id === templateId });
   }
-  await batch.commit();
-  return jsonResponse(200, { ok: true });
+  await flagBatch.commit();
+
+  const versionId = await latestTemplateVersionId(db, templateId);
+  const patientSnap = await db
+    .collection(COLLECTIONS.workspacePatients)
+    .where('workspaceId', '==', template.workspaceId)
+    .get();
+  const active = patientSnap.docs.filter((d) => !(d.data() as WorkspacePatientDoc).archivedAt);
+
+  const openSnaps = await Promise.all(
+    active.map((p) =>
+      db
+        .collection(COLLECTIONS.assignments)
+        .where('workspacePatientId', '==', p.id)
+        .where('endsAt', '==', null)
+        .get(),
+    ),
+  );
+
+  const today = todayInAR();
+  const yesterday = yesterdayInAR();
+  const ops: Array<{ kind: 'update' | 'set'; ref: DocumentReference; data: object }> = [];
+  let assignedCount = 0;
+  let skippedCount = 0;
+
+  active.forEach((p, i) => {
+    const open = openSnaps[i]!.docs;
+    const current = open[0]?.data() as AssignmentDoc | undefined;
+    if (current?.templateId === templateId && current?.templateVersionId === versionId) {
+      skippedCount += 1;
+      return;
+    }
+    assignedCount += 1;
+    for (const d of open) {
+      ops.push({ kind: 'update', ref: d.ref, data: { endsAt: yesterday } });
+    }
+    ops.push({
+      kind: 'set',
+      ref: db.collection(COLLECTIONS.assignments).doc(uuidv4()),
+      data: {
+        workspacePatientId: p.id,
+        templateId,
+        templateVersionId: versionId,
+        startsAt: today,
+        endsAt: null,
+        createdAt: nowISO(),
+      } satisfies AssignmentDoc,
+    });
+  });
+
+  const chunk = 400;
+  for (let i = 0; i < ops.length; i += chunk) {
+    const writeBatch = db.batch();
+    for (const op of ops.slice(i, i + chunk)) {
+      if (op.kind === 'update') writeBatch.update(op.ref, op.data);
+      else writeBatch.set(op.ref, op.data);
+    }
+    await writeBatch.commit();
+  }
+
+  return jsonResponse(200, { ok: true, name: template.name, assignedCount, skippedCount });
 }
 
 export async function handleRemoveMember(auth: AuthContext, workspaceId: string, memberId: string) {
