@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
+import { GoogleIcon } from '@/components/brand/GoogleIcon';
 
 export interface AuthFormProps {
   mode: 'login' | 'register';
@@ -223,6 +224,7 @@ export function AuthForm({
 
         {allowGoogle ? (
           <Button variant="secondary" fullWidth onClick={handleGoogle} disabled={loading}>
+            <GoogleIcon />
             Continuar con Google
           </Button>
         ) : null}
