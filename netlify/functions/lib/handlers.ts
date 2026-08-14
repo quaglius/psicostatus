@@ -39,7 +39,7 @@ import {
   getWorkspaceMember,
   listVisiblePatients,
 } from './access';
-import { COLLECTIONS, getAdminAuth, getDb, saveStorageObject } from './firebase';
+import { COLLECTIONS, getAdminAuth, getDb } from './firebase';
 import { ApiHttpError, type AuthContext, jsonResponse, parseBody, verifyBearer } from './http';
 
 function yesterdayInAR(): string {
@@ -1552,6 +1552,25 @@ export async function handleRemoveMember(auth: AuthContext, workspaceId: string,
   return jsonResponse(200, { ok: true });
 }
 
+export async function handleGetUpload(uploadId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(uploadId)) {
+    throw new ApiHttpError(404, 'NOT_FOUND', 'No encontramos la imagen');
+  }
+  const doc = await getDb().collection(COLLECTIONS.uploads).doc(uploadId).get();
+  if (!doc.exists) throw new ApiHttpError(404, 'NOT_FOUND', 'No encontramos la imagen');
+  const data = doc.data() as { contentType: string; bytes: string };
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': data.contentType || 'image/webp',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Access-Control-Allow-Origin': '*',
+    },
+    body: data.bytes,
+    isBase64Encoded: true,
+  };
+}
+
 export async function handleUpload(auth: AuthContext, event: HandlerEvent) {
   const body = parseBody<{ purpose: 'workspace' | 'patient'; targetId: string; dataUrl: string }>(event);
   if (!body.dataUrl?.startsWith('data:image/') || !body.targetId) {
@@ -1567,41 +1586,27 @@ export async function handleUpload(auth: AuthContext, event: HandlerEvent) {
   const match = body.dataUrl.match(/^data:(image\/[\w+.-]+);base64,(.+)$/);
   if (!match) throw new ApiHttpError(400, 'INVALID_INPUT', 'La imagen no es válida');
   const contentType = match[1]!;
-  const buffer = Buffer.from(match[2]!, 'base64');
-  if (buffer.length > 1_500_000) {
+  const bytes = match[2]!;
+  const buffer = Buffer.from(bytes, 'base64');
+  if (buffer.length > 700_000) {
     throw new ApiHttpError(400, 'TOO_LARGE', 'La imagen es muy pesada. Probá con otra más chica.');
   }
 
-  const token = uuidv4();
-  const path = `shanti/${body.purpose}/${body.targetId}/${token}.webp`;
-  try {
-    const { bucketName } = await saveStorageObject(path, buffer, contentType, token);
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
-    if (body.purpose === 'workspace') {
-      await getDb().collection(COLLECTIONS.workspaces).doc(body.targetId).update({ imageUrl: url });
-    } else {
-      await getDb().collection(COLLECTIONS.workspacePatients).doc(body.targetId).update({ photoUrl: url });
-    }
-    return jsonResponse(200, { url });
-  } catch (err) {
-    if (err instanceof ApiHttpError) throw err;
-    console.error(err);
-    const extra = err as { code?: unknown; message?: unknown };
-    const raw = `${extra?.code ?? ''} ${extra?.message ?? (err instanceof Error ? err.message : '')}`;
-    if (/404|not found|does not exist/i.test(raw)) {
-      throw new ApiHttpError(
-        500,
-        'UPLOAD_FAILED',
-        'Falta crear Storage en Firebase: Consola → Compilación → Storage → Comenzar. Tiene que ser el mismo proyecto (psicostatus).',
-      );
-    }
-    if (/403|forbidden|permission|access/i.test(raw)) {
-      throw new ApiHttpError(
-        500,
-        'UPLOAD_FAILED',
-        'No hay permiso para subir archivos. Revisá que la cuenta de servicio tenga acceso a Storage.',
-      );
-    }
-    throw new ApiHttpError(500, 'UPLOAD_FAILED', 'No pudimos guardar la imagen. Probá con otra más liviana o más tarde.');
+  const id = uuidv4();
+  const db = getDb();
+  await db.collection(COLLECTIONS.uploads).doc(id).set({
+    purpose: body.purpose,
+    targetId: body.targetId,
+    contentType,
+    bytes,
+    createdBy: auth.userId,
+    createdAt: nowISO(),
+  });
+  const url = `/api/uploads/${id}`;
+  if (body.purpose === 'workspace') {
+    await db.collection(COLLECTIONS.workspaces).doc(body.targetId).update({ imageUrl: url });
+  } else {
+    await db.collection(COLLECTIONS.workspacePatients).doc(body.targetId).update({ photoUrl: url });
   }
+  return jsonResponse(200, { url });
 }

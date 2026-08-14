@@ -37,6 +37,7 @@ import {
   handleRemoveMember,
   handleRotateInvite,
   handleUpload,
+  handleGetUpload,
   handleWorkspaceOverview,
 } from './lib/handlers';
 import { authenticate, errorResponse, getPath, jsonResponse } from './lib/http';
@@ -57,6 +58,9 @@ async function route(event: HandlerEvent) {
 
   if (method === 'POST' && path === 'me/bootstrap') {
     return handleBootstrap(event);
+  }
+  if (method === 'GET' && path.match(/^uploads\/[^/]+$/)) {
+    return handleGetUpload(path.replace('uploads/', ''));
   }
 
   const auth = await authenticate(event);

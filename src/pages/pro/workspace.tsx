@@ -120,7 +120,7 @@ export function WorkspacePage() {
           const msg =
             err instanceof ApiClientError
               ? err.message
-              : 'El nombre se guardó, pero la foto no. Activá Storage en Firebase o probá otra imagen.';
+              : 'El nombre se guardó, pero la foto no. Probá con otra más chica.';
           setSaveError(msg);
           await refreshMe();
           return;
