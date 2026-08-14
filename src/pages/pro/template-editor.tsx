@@ -155,7 +155,7 @@ export function TemplateEditorPage() {
       <Link to="/pro/plantillas" className="mb-4 inline-block text-sm text-[var(--sage)]">
         ← Volver al listado
       </Link>
-      <h1 className="font-display text-3xl">{isNew ? 'Nueva plantilla' : 'Editar plantilla'}</h1>
+      <h1 className="font-display text-2xl sm:text-3xl">{isNew ? 'Nueva plantilla' : 'Editar plantilla'}</h1>
       <p className="mb-6 mt-1 text-sm text-[var(--ink-soft)]">
         La plantilla es el formulario que ve el paciente. Cada cambio crea una versión nueva: lo que ya cargaron no se borra.
       </p>
@@ -230,8 +230,8 @@ export function TemplateEditorPage() {
           <p className="mb-2 font-medium">Preguntas del formulario</p>
           <div className="space-y-3">
             {fields.map((f, i) => (
-              <div key={f.id} className="flex items-start gap-2 rounded-[var(--radius-input)] border border-[var(--line)] p-3">
-                <div className="flex flex-col gap-1">
+              <div key={f.id} className="rounded-[var(--radius-input)] border border-[var(--line)] p-3 sm:flex sm:items-start sm:gap-2">
+                <div className="mb-2 flex gap-1 sm:mb-0 sm:flex-col">
                   <button type="button" className="text-[var(--ink-soft)] transition-transform active:scale-90" onClick={() => moveField(i, -1)} aria-label="Subir">
                     <ArrowUp size={16} />
                   </button>
@@ -239,13 +239,13 @@ export function TemplateEditorPage() {
                     <ArrowDown size={16} />
                   </button>
                 </div>
-                <div className="flex-1 space-y-2">
-                  <p className="flex items-center gap-2 text-xs text-[var(--sage)]">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="flex items-center gap-2 text-xs font-medium text-[var(--sage)]">
                     <FieldTypeIcon type={f.type} size={14} />
                     {FIELD_TYPE[f.type].label}
                   </p>
                   <Input
-                    label="Cómo se lo preguntamos al paciente"
+                    label="Pregunta para el paciente"
                     value={f.label}
                     onChange={(e) => updateField(i, { label: e.target.value })}
                   />
@@ -273,9 +273,9 @@ export function TemplateEditorPage() {
                     />
                   ) : null}
                   {f.type === 'yes_no' ? (
-                    <p className="text-sm text-[var(--ink-soft)]">El paciente elige Sí o No con dos botones.</p>
+                    <p className="text-xs leading-relaxed text-[var(--ink-soft)]">El paciente elige Sí o No con dos botones.</p>
                   ) : (
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
                       <input
                         type="checkbox"
                         checked={f.required}

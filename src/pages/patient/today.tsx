@@ -157,7 +157,7 @@ export function PatientTodayPage() {
       onWorkspaceChange={setActiveWsId}
     >
       <div className="mb-6">
-        <h1 className="font-display flex items-center gap-2 text-2xl text-[var(--ink)]">
+        <h1 className="font-display flex flex-wrap items-center gap-x-2 gap-y-1 text-xl leading-snug text-[var(--ink)] sm:text-2xl">
           {greeting}
           {templateVersion?.patientGuide ? (
             <HelpTip title="Qué te pedimos hoy" text={templateVersion.patientGuide} />

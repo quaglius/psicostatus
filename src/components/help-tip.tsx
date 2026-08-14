@@ -26,7 +26,7 @@ export function HelpTip({ title, text, label = 'Cómo cargar' }: { title?: strin
           <Button onClick={() => setOpen(false)}>Entendido</Button>
         }
       >
-        <p className="whitespace-pre-wrap text-[var(--ink)]">{text}</p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink)]">{text}</p>
       </Sheet>
     </>
   );

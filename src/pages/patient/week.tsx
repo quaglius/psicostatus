@@ -66,7 +66,7 @@ export function PatientWeekPage() {
       activeWorkspaceId={activeWsId}
       onWorkspaceChange={setActiveWsId}
     >
-      <h1 className="font-display mb-2 flex items-center gap-2 text-2xl">
+      <h1 className="font-display mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xl leading-snug sm:text-2xl">
         Tu historial
         {templateVersion?.patientGuide ? (
           <HelpTip title="Qué te pedimos" text={templateVersion.patientGuide} />

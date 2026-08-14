@@ -22,7 +22,7 @@ export function EntryForm({ fields, values, onChange, errors = {} }: EntryFormPr
     <div className="space-y-6">
       {sorted.map((field) => (
         <div key={field.id} className="space-y-3">
-          <h3 className="font-display text-2xl text-[var(--ink)]">{field.label}</h3>
+          <h3 className="font-display text-lg leading-snug text-[var(--ink)] sm:text-xl">{field.label}</h3>
 
           {field.type === 'scale' ? (
             <ScaleField

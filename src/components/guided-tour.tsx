@@ -141,10 +141,10 @@ export function GuidedTour({ tourId, userId, steps, autoStartPath }: GuidedTourP
         <p className="text-xs text-[var(--sage)]">
           {index + 1} de {steps.length}
         </p>
-        <h2 id="tour-title" className="font-display mt-1 text-xl">
+        <h2 id="tour-title" className="font-display mt-1 text-base leading-snug sm:text-lg">
           {step.title}
         </h2>
-        <p className="mt-2 text-sm text-[var(--ink-soft)]">{step.body}</p>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]">{step.body}</p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <button type="button" className="text-sm text-[var(--ink-soft)] underline" onClick={finish}>
             Saltar
